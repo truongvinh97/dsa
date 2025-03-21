@@ -10,8 +10,8 @@ import os
 BROKER_IP = "192.168.1.12"       # MQTT broker IP (e.g., Raspberry Pi)
 BROKER_PORT = 1883               # MQTT broker port
 TOPIC = "test"                   # MQTT topic that the board subscribes to
-FIRMWARE_FILE = "STM_ESP_SETUP.hex"  # Path to the firmware file (Intel HEX or binary)
-CHUNK_SIZE = 512                 # Number of bytes per OTA chunk
+FIRMWARE_FILE = "STM_ESP_SETUP.hex"  # Path to the firmware file (Intel HEX format)
+CHUNK_SIZE = 2048                # Increased chunk size: 2048 bytes (2KB)
 NEW_FW_VERSION = "0x0101"        # New firmware version to be sent
 
 ###############################################################################
@@ -59,20 +59,13 @@ def load_firmware_hex(filename):
 def load_firmware(filename):
     """
     Reads the firmware file and returns its content as bytes.
-    If the file extension is '.hex', it parses it as an Intel HEX file;
-    otherwise, it reads it as a binary file.
+    Since the firmware file is always in Intel HEX format, we call load_firmware_hex().
     """
-    _, ext = os.path.splitext(filename)
-    if ext.lower() == ".hex":
-        return load_firmware_hex(filename)
-    else:
-        with open(filename, "rb") as f:
-            return f.read()
+    return load_firmware_hex(filename)
 
 def compute_sha256(data):
     """
-    Computes and returns the SHA-256 hash of the given data
-    as an uppercase hex string.
+    Computes and returns the SHA-256 hash of the given data as an uppercase hex string.
     """
     hash_obj = hashlib.sha256()
     hash_obj.update(data)
@@ -83,18 +76,12 @@ def compute_sha256(data):
 ###############################################################################
 def on_connect(client, userdata, flags, rc):
     print(f"[on_connect] rc={rc}")
-    # If you need to subscribe, do it here:
-    # client.subscribe(TOPIC)
 
 def on_publish(client, userdata, mid):
     print(f"[on_publish] mid={mid}")
 
 def on_disconnect(client, userdata, rc):
     print(f"[on_disconnect] rc={rc}")
-
-# Optional if you want to handle incoming messages
-def on_message(client, userdata, msg):
-    print(f"[on_message] Topic={msg.topic}, Payload={msg.payload.decode()}")
 
 ###############################################################################
 #                     Publishing the OTA Update (MQTTv3.1.1)                  #
@@ -103,13 +90,12 @@ def publish_ota_update(client, firmware_data):
     """
     Publishes OTA update messages (start and chunks) to the MQTT topic.
     First, an OTA_START message is sent with firmware size, new version, and hash.
-    Then, the firmware binary data is split into CHUNK_SIZE pieces
-    and sent as OTA_CHUNK messages.
+    Then, the firmware binary data is split into CHUNK_SIZE pieces and sent as OTA_CHUNK messages.
     """
     fw_size = len(firmware_data)
     fw_hash = compute_sha256(firmware_data)
     
-    # Construct OTA_START JSON message
+    # Construct OTA_START JSON message with QoS 0
     ota_start_msg = json.dumps({
         "command": "OTA_START",
         "fwSize": fw_size,
@@ -119,15 +105,19 @@ def publish_ota_update(client, firmware_data):
     
     print("[OTA] Publishing OTA_START message:")
     print(ota_start_msg)
-    client.publish(TOPIC, ota_start_msg)
-    time.sleep(1)  # Wait for the board to process the start command
+    client.publish(TOPIC, ota_start_msg, qos=0)
+    time.sleep(0.2)  # Reduced delay after OTA_START to 0.2 seconds
     
     # Break the firmware into chunks and send OTA_CHUNK messages
     num_chunks = (fw_size + CHUNK_SIZE - 1) // CHUNK_SIZE
     print(f"[OTA] Publishing firmware in {num_chunks} chunks...")
     for i in range(num_chunks):
         chunk = firmware_data[i * CHUNK_SIZE : (i + 1) * CHUNK_SIZE]
-        # Convert binary chunk to an uppercase hex string
+        # Directly send binary data as payload; if your receiver supports raw binary,
+        # you can send it without hex conversion. Otherwise, you can convert to Base64.
+        # Ở đây, ví dụ gửi raw binary:
+        # client.publish(TOPIC, chunk, qos=0)
+        # Nếu receiver cần chuỗi, ta dùng hex encoding:
         hex_chunk = binascii.hexlify(chunk).decode('utf-8').upper()
         last_flag = (i == num_chunks - 1)
         ota_chunk_msg = json.dumps({
@@ -136,14 +126,14 @@ def publish_ota_update(client, firmware_data):
             "last": last_flag
         })
         print(f"[OTA] Publishing OTA_CHUNK {i+1}/{num_chunks}, last={last_flag}")
-        client.publish(TOPIC, ota_chunk_msg)
-        time.sleep(0.1)  # Short delay between chunks
+        client.publish(TOPIC, ota_chunk_msg, qos=0)
+        time.sleep(0.01)  # Reduced delay between chunks
 
 ###############################################################################
 #                                   Main                                       #
 ###############################################################################
 def main():
-    # 1) Load firmware data (from .hex or .bin file)
+    # Load firmware data (from the HEX file)
     try:
         firmware_data = load_firmware(FIRMWARE_FILE)
     except Exception as e:
@@ -152,14 +142,13 @@ def main():
 
     print(f"Firmware loaded: {len(firmware_data)} bytes")
     
-    # 2) Create an MQTT client using MQTT v3.1.1 (compatible with paho-mqtt < 2.0)
+    # Create an MQTT client using MQTT v3.1.1 (compatible with paho-mqtt < 2.0)
     client = mqtt.Client(client_id="OTA_Sender", protocol=mqtt.MQTTv311)
 
-    # 3) Assign the older callback signatures
+    # Assign callback functions
     client.on_connect = on_connect
     client.on_publish = on_publish
     client.on_disconnect = on_disconnect
-    # client.on_message = on_message  # If you want to receive messages
 
     try:
         print(f"Connecting to broker at {BROKER_IP}:{BROKER_PORT} (MQTT v3.1.1)...")
@@ -168,19 +157,18 @@ def main():
         print(f"MQTT connection error: {e}")
         return
 
-    # Optionally run a network loop in the background:
-    # client.loop_start()
+    # Use loop_start() to handle networking asynchronously
+    client.loop_start()
 
-    # 4) Publish OTA update
+    # Publish OTA update messages
     publish_ota_update(client, firmware_data)
     
     print("[OTA] Firmware OTA update messages sent.")
     
-    # 5) Disconnect gracefully
+    # Allow some time for all messages to be processed before disconnecting
+    time.sleep(1)
+    client.loop_stop()
     client.disconnect()
-
-    # If loop_start() was used, also stop it:
-    # client.loop_stop()
 
 if __name__ == "__main__":
     main()
