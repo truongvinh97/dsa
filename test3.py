@@ -5,9 +5,9 @@ import subprocess
 import time
 
 # ------------ Cấu hình -------------
-BROKER_IP = "192.168.1.12"        # MQTT broker IP (e.g., Raspberry Pi)
+BROKER_IP = "192.168.1.11"        # MQTT broker IP (e.g., Raspberry Pi)
 BROKER_PORT = 1883                # MQTT broker port
-MQTT_TOPIC = "OTA/notice"         # MQTT topic thông báo OTA
+MQTT_TOPIC = "test"         # MQTT topic thông báo OTA
 
 FIRMWARE_FILE = "STM_ESP_SETUP.hex"    # Tệp firmware ở định dạng Intel HEX
 NEW_FW_VERSION = "0x0101"         # Phiên bản firmware
@@ -47,6 +47,7 @@ def publish_ota_info(cid):
 
     # Tạo payload JSON: gửi CID + version
     payload = {
+        "command": "OTA_IPFS",
         "cid": cid,
         "version": NEW_FW_VERSION
     }
