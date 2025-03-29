@@ -22,7 +22,7 @@ const mqtt = require("mqtt");
 // ----------- Configuration Section -----------
 
 // Ethereum configuration (local Ganache or testnet)
-const web3 = new Web3("http://192.168.1.14:7545");
+const web3 = new Web3("http://192.168.1.3:7545");
 
 // Load FirmwareRegistry contract artifact
 const contractJSON = JSON.parse(fs.readFileSync("./build/contracts/FirmwareRegistry.json", "utf8"));
@@ -38,7 +38,7 @@ const mqttBroker = "mqtt://192.168.1.12";  // Update if your MQTT broker is else
 const mqttTopic = "test";         // Topic to notify devices
 
 // IPFS gateway URL
-const ipfsGateway = "http://127.0.0.1:8080/ipfs/";
+const ipfsGateway = "http://192.168.1.3:8080/ipfs/";
 
 // The target firmware version to check (e.g., "0x0103")
 const targetVersion = "0x0100";
