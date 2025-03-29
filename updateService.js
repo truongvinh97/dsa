@@ -22,12 +22,12 @@ const mqtt = require("mqtt");
 // ----------- Configuration Section -----------
 
 // Ethereum configuration (local Ganache or testnet)
-const web3 = new Web3("http://127.0.0.1:8545");
+const web3 = new Web3("http://127.0.0.1:7545");
 
 // Load FirmwareRegistry contract artifact
 const contractJSON = JSON.parse(fs.readFileSync("./build/contracts/FirmwareRegistry.json", "utf8"));
 const abi = contractJSON.abi;
-const contractAddress = "<PUT_DEPLOYED_CONTRACT_ADDRESS_HERE>";  // Replace with your deployed address
+const contractAddress = "0x7AC662Ed5264245B8df79156226435aBfD45729E";  // Replace with your deployed address
 const firmwareRegistry = new web3.eth.Contract(abi, contractAddress);
 
 // Manufacturer's public key file (for signature verification)
@@ -35,13 +35,13 @@ const manufacturerPubKeyPath = "manufacturer_public_key.pem";
 
 // MQTT configuration
 const mqttBroker = "mqtt://127.0.0.1";  // Update if your MQTT broker is elsewhere
-const mqttTopic = "ota/update";         // Topic to notify devices
+const mqttTopic = "test";         // Topic to notify devices
 
 // IPFS gateway URL
 const ipfsGateway = "http://127.0.0.1:8080/ipfs/";
 
 // The target firmware version to check (e.g., "0x0103")
-const targetVersion = "0x0103";
+const targetVersion = "0x0100";
 
 // Local temporary file name for the downloaded firmware
 const downloadedFirmwareFile = "downloaded_firmware.hex";
