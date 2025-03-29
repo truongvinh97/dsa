@@ -5,7 +5,7 @@ import subprocess
 import time
 
 # ------------ Cấu hình -------------
-BROKER_IP = "192.168.1.11"        # MQTT broker IP (e.g., Raspberry Pi)
+BROKER_IP = "192.168.1.12"        # MQTT broker IP (e.g., Raspberry Pi)
 BROKER_PORT = 1883                # MQTT broker port
 MQTT_TOPIC = "test"         # MQTT topic thông báo OTA
 
@@ -61,8 +61,8 @@ def publish_ota_info(cid):
 
 def main():
     # 1) Upload file firmware .hex lên IPFS, lấy CID
-    cid = 0;
-    //cid = add_file_to_ipfs(FIRMWARE_FILE)
+    #cid = 0;
+    cid = add_file_to_ipfs(FIRMWARE_FILE)
     if cid is None:
         print("Failed to upload file to IPFS.")
         return
