@@ -27,7 +27,7 @@ const web3 = new Web3("http://192.168.1.3:7545");
 // Load FirmwareRegistry contract artifact
 const contractJSON = JSON.parse(fs.readFileSync("./build/contracts/FirmwareRegistry.json", "utf8"));
 const abi = contractJSON.abi;
-const contractAddress = "0x7AC662Ed5264245B8df79156226435aBfD45729E";  // Replace with your deployed address
+const contractAddress = "0xbaC9243aaB9879a0B80395A68349111F90028Ce8";  // Replace with your deployed address
 const firmwareRegistry = new web3.eth.Contract(abi, contractAddress);
 
 // Manufacturer's public key file (for signature verification)
