@@ -75,17 +75,40 @@ async function readFirmwareMetadata(version) {
  */
 function verifySignature(messageHex, signatureHex, pubKeyPath) {
   console.log("Verifying firmware metadata signature...");
-  const pubKeyPem = fs.readFileSync(pubKeyPath, "utf8");
-  const verifier = crypto.createVerify("sha256");
-  // In this example, the message is the firmware hash (already computed).
-  const messageBuffer = Buffer.from(messageHex.replace(/^0x/, ""), "hex");
-  verifier.update(messageBuffer);
-  verifier.end();
-  const signatureBuffer = Buffer.from(signatureHex.replace(/^0x/, ""), "hex");
-  const isValid = verifier.verify(pubKeyPem, signatureBuffer);
-  console.log("Signature valid?", isValid);
-  return isValid;
+  
+  try {
+    // Read and log the public key content (showing first 100 characters)
+    const pubKeyPem = fs.readFileSync(pubKeyPath, "utf8");
+    console.log("Public Key PEM (first 100 chars):", pubKeyPem.slice(0, 100));
+
+    // Create the verifier object using SHA-256 as the digest algorithm
+    const verifier = crypto.createVerify("sha256");
+
+    // Prepare the message buffer from the provided messageHex (firmware hash)
+    const cleanedMessageHex = messageHex.replace(/^0x/, "");
+    const messageBuffer = Buffer.from(cleanedMessageHex, "hex");
+    console.log("Message Buffer (hex):", messageBuffer.toString("hex"), "Length:", messageBuffer.length);
+
+    // Update the verifier with the message data
+    verifier.update(messageBuffer);
+    verifier.end();
+
+    // Prepare the signature buffer from the provided signatureHex
+    const cleanedSignatureHex = signatureHex.replace(/^0x/, "");
+    const signatureBuffer = Buffer.from(cleanedSignatureHex, "hex");
+    console.log("Signature Buffer (hex):", signatureBuffer.toString("hex"), "Length:", signatureBuffer.length);
+
+    // Perform the signature verification
+    const isValid = verifier.verify(pubKeyPem, signatureBuffer);
+    console.log("Signature valid?", isValid ? "YES" : "NO");
+    
+    return isValid;
+  } catch (err) {
+    console.error("Error during signature verification:", err);
+    return false;
+  }
 }
+
 
 /**
  * downloadFirmwareFromIPFS:
