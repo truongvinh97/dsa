@@ -4,12 +4,12 @@
  * This script performs the following steps:
  * 1. Query the FirmwareRegistry smart contract for a new firmware version.
  * 2. Download the firmware metadata: (version, hash, cid, signature).
- * 3. Authenticate the metadata using the manufacturer's public key.
- *    If signature verification fails, abort.
- * 4. If valid, download the firmware file from IPFS via an HTTP gateway.
- * 5. Recompute the SHA-256 hash of the downloaded firmware and compare it with the metadata hash.
+ * 3. Download the firmware file from IPFS via an HTTP gateway.
+ * 4. Recompute the SHA-256 hash of the downloaded firmware and compare it with the metadata hash.
  *    If they do not match, abort.
- * 6. If valid, publish an MQTT message to the device with firmware version, IPFS CID, and firmware hash.
+ * 5. Verify the digital signature using the manufacturer's public key on the downloaded firmware file.
+ *    If signature verification fails, abort.
+ * 6. If the firmware is valid, publish an MQTT message to the device with firmware version, IPFS CID, and firmware hash.
  * 7. Optionally, log or update a "device contract" with the device's update attempt.
  */
 
@@ -30,22 +30,22 @@ const abi = contractJSON.abi;
 const contractAddress = "0xbaC9243aaB9879a0B80395A68349111F90028Ce8"; // Replace with your deployed contract address
 const firmwareRegistry = new web3.eth.Contract(abi, contractAddress);
 
-// Manufacturer's public key file (ensure this PEM file is identical to the one used on the host)
+// Manufacturer's public key file (must be the correct public key, not the private key)
 const manufacturerPubKeyPath = "manufacturer_public_key.pem";
 
-// MQTT configuration: set the broker IP (use the LAN IP of your MQTT broker)
+// MQTT configuration: set the broker IP and topic
 const mqttBroker = "mqtt://192.168.1.12";  // Update as needed
 const mqttTopic = "ota/update";            // Topic for OTA update notifications
 
-// IPFS gateway URL (ensure it’s accessible by the Pi; use LAN IP if needed)
+// IPFS gateway URL (ensure it’s accessible by the Pi; use LAN IP or a public gateway)
 const ipfsGateway = "https://ipfs.io/ipfs/";
 
 // The target firmware version to check in the contract
 const targetVersion = "0x0101";
 
-// Temporary file name to store the downloaded firmware
-const downloadedFirmwareFile = "downloaded_firmware.hex";
-const FirmwareFile = "firmware.hex";
+// Temporary file names
+const downloadedFirmwareFile = "downloaded_firmware.hex"; // Firmware downloaded from IPFS
+// (If you have a local firmware file for other purposes, ignore it here)
 
 // ----------- End Configuration Section -----------
 
@@ -67,63 +67,28 @@ async function readFirmwareMetadata(version) {
 /**
  * verifySignature:
  * Verifies the digital signature using the manufacturer's public key.
- * It uses Node's crypto module to verify the signature on the firmware hash.
+ * This version reads the entire firmware file (downloaded from IPFS) and verifies that
+ * the signature (DER-encoded, provided as hex) is valid for that file.
  *
- * @param {string} messageHex - The firmware hash (e.g., "0xabc123...")
- * @param {string} signatureHex - The signature in hex (DER encoded, prefixed with 0x)
+ * @param {string} filePath - The path to the downloaded firmware file.
+ * @param {string} signatureHex - The signature in hex (prefixed with "0x").
  * @param {string} pubKeyPath - Path to the manufacturer's public key PEM file.
  * @returns {boolean} - True if the signature is valid, false otherwise.
- *
-function verifySignature(messageHex, signatureHex, pubKeyPath) {
-  console.log("Verifying firmware metadata signature...");
-  
-  try {
-    // Read and log the public key content (showing first 100 characters)
-    const pubKeyPem = fs.readFileSync(pubKeyPath, "utf8");
-    console.log("Public Key PEM (first 100 chars):", pubKeyPem.slice(0, 100));
-
-    // Create the verifier object using SHA-256 as the digest algorithm
-    const verifier = crypto.createVerify("sha256");
-
-    // Prepare the message buffer from the provided messageHex (firmware hash)
-    const cleanedMessageHex = messageHex.replace(/^0x/, "");
-    const messageBuffer = Buffer.from(cleanedMessageHex, "hex");
-    console.log("Message Buffer (hex):", messageBuffer.toString("hex"), "Length:", messageBuffer.length);
-
-    // Update the verifier with the message data
-    verifier.update(messageBuffer);
-    verifier.end();
-
-    // Prepare the signature buffer from the provided signatureHex
-    const cleanedSignatureHex = signatureHex.replace(/^0x/, "");
-    const signatureBuffer = Buffer.from(cleanedSignatureHex, "hex");
-    console.log("Signature Buffer (hex):", signatureBuffer.toString("hex"), "Length:", signatureBuffer.length);
-
-    // Perform the signature verification
-    const isValid = verifier.verify(pubKeyPem, signatureBuffer);
-    console.log("Signature valid?", isValid ? "YES" : "NO");
-    
-    return isValid;
-  } catch (err) {
-    console.error("Error during signature verification:", err);
-    return false;
-  }
-}*/
-
+ */
 function verifySignature(filePath, signatureHex, pubKeyPath) {
   console.log("Verifying signature for file:", filePath);
   
   try {
-    // Read the public key in PEM format.
+    // Read and log the public key content (first 100 characters for debugging)
     const pubKeyPem = fs.readFileSync(pubKeyPath, "utf8");
     console.log("Public Key PEM (first 100 chars):", pubKeyPem.slice(0, 100));
 
     // Create a verifier with SHA-256 as the digest algorithm.
     const verifier = crypto.createVerify("sha256");
 
-    // Read the entire file content that was signed.
+    // Read the entire firmware file content (downloaded from IPFS)
     const fileData = fs.readFileSync(filePath);
-    console.log("File data length:", fileData.length);
+    console.log("Downloaded file length:", fileData.length);
 
     // Update the verifier with the file data.
     verifier.update(fileData);
@@ -143,8 +108,6 @@ function verifySignature(filePath, signatureHex, pubKeyPath) {
     return false;
   }
 }
-
-
 
 /**
  * downloadFirmwareFromIPFS:
@@ -185,7 +148,7 @@ function verifyFirmwareHash(filePath, expectedHashHex) {
 
 /**
  * notifyDevice:
- * Publishes an MQTT message to notify the device that new firmware is ready.
+ * Publishes an MQTT message to notify the device that the new firmware is ready.
  * The message includes the firmware version, IPFS CID, and firmware hash.
  *
  * @param {string} version - Firmware version.
@@ -226,8 +189,7 @@ function notifyDevice(version, cid, firmwareHash) {
 async function updateDeviceContract(deviceId, firmwareVersion) {
   // For demonstration, simply log the update attempt.
   console.log(`Recording update attempt: device=${deviceId}, firmwareVersion=${firmwareVersion}`);
-  // In production, you might invoke a function on a device contract:
-  // e.g., await deviceContract.methods.recordUpdateAttempt(deviceId, firmwareVersion, Date.now()).send({ ... });
+  // In production, you might call a smart contract function here.
 }
 
 /**
@@ -243,36 +205,35 @@ async function main() {
       return;
     }
     // Destructure metadata (version, hash, cid, signature).
-    const { version, hash: firmwareHash, cid, signature } = metadata;
+    const { version, hash: metadataFirmwareHash, cid, signature } = metadata;
 
-    // Step 2: Verify the metadata signature using the manufacturer's public key.
-    const isSignatureValid = verifySignature(FirmwareFile, signature, manufacturerPubKeyPath);
-    if (!isSignatureValid) {
-      console.log("Firmware metadata signature verification failed. Aborting update.");
-      return;
-    }
-
-    // Step 3: Download the firmware file from IPFS using the provided CID.
+    // Step 2: Download the firmware file from IPFS using the provided CID.
     const downloadSuccess = downloadFirmwareFromIPFS(cid, downloadedFirmwareFile);
     if (!downloadSuccess) {
       console.log("Failed to download firmware from IPFS. Aborting update.");
       return;
     }
 
-    // Step 4: Recompute the SHA-256 hash of the downloaded firmware and compare.
-    const isHashValid = verifyFirmwareHash(downloadedFirmwareFile, firmwareHash);
+    // Step 3: Recompute the firmware hash of the downloaded file and compare it with the metadata hash.
+    const isHashValid = verifyFirmwareHash(downloadedFirmwareFile, metadataFirmwareHash);
     if (!isHashValid) {
       console.log("Firmware hash mismatch after download. Aborting update.");
       return;
     }
+    console.log("Firmware hash verification succeeded.");
 
-    console.log("Firmware metadata and file verification succeeded.");
+    // Step 4: Verify the digital signature using the downloaded firmware file.
+    const isSignatureValid = verifySignature(downloadedFirmwareFile, signature, manufacturerPubKeyPath);
+    if (!isSignatureValid) {
+      console.log("Firmware signature verification failed. Aborting update.");
+      return;
+    }
+    console.log("Firmware signature verification succeeded.");
 
     // Step 5: Notify the device via MQTT that the new firmware is ready.
-    notifyDevice(version, cid, firmwareHash);
+    notifyDevice(version, cid, metadataFirmwareHash);
 
     // Step 6: Optionally, update the device contract with the device's update attempt.
-    // For example, using a deviceId "device123":
     await updateDeviceContract("device123", version);
 
     console.log("Update Service completed successfully.");
