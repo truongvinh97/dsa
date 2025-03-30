@@ -41,10 +41,11 @@ const mqttTopic = "ota/update";            // Topic for OTA update notifications
 const ipfsGateway = "https://ipfs.io/ipfs/";
 
 // The target firmware version to check in the contract
-const targetVersion = "0x0100";
+const targetVersion = "0x0101";
 
 // Temporary file name to store the downloaded firmware
 const downloadedFirmwareFile = "downloaded_firmware.hex";
+const FirmwareFile = "firmware.hex";
 
 // ----------- End Configuration Section -----------
 
@@ -72,7 +73,7 @@ async function readFirmwareMetadata(version) {
  * @param {string} signatureHex - The signature in hex (DER encoded, prefixed with 0x)
  * @param {string} pubKeyPath - Path to the manufacturer's public key PEM file.
  * @returns {boolean} - True if the signature is valid, false otherwise.
- */
+ *
 function verifySignature(messageHex, signatureHex, pubKeyPath) {
   console.log("Verifying firmware metadata signature...");
   
@@ -107,7 +108,42 @@ function verifySignature(messageHex, signatureHex, pubKeyPath) {
     console.error("Error during signature verification:", err);
     return false;
   }
+}*/
+
+function verifySignature(filePath, signatureHex, pubKeyPath) {
+  console.log("Verifying signature for file:", filePath);
+  
+  try {
+    // Read the public key in PEM format.
+    const pubKeyPem = fs.readFileSync(pubKeyPath, "utf8");
+    console.log("Public Key PEM (first 100 chars):", pubKeyPem.slice(0, 100));
+
+    // Create a verifier with SHA-256 as the digest algorithm.
+    const verifier = crypto.createVerify("sha256");
+
+    // Read the entire file content that was signed.
+    const fileData = fs.readFileSync(filePath);
+    console.log("File data length:", fileData.length);
+
+    // Update the verifier with the file data.
+    verifier.update(fileData);
+    verifier.end();
+
+    // Convert the provided signature from hex to a buffer.
+    const signatureBuffer = Buffer.from(signatureHex.replace(/^0x/, ""), "hex");
+    console.log("Signature Buffer (hex):", signatureBuffer.toString("hex"), "Length:", signatureBuffer.length);
+
+    // Verify the signature using the public key.
+    const isValid = verifier.verify(pubKeyPem, signatureBuffer);
+    console.log("Signature valid?", isValid ? "YES" : "NO");
+    
+    return isValid;
+  } catch (err) {
+    console.error("Error during signature verification:", err);
+    return false;
+  }
 }
+
 
 
 /**
@@ -210,7 +246,7 @@ async function main() {
     const { version, hash: firmwareHash, cid, signature } = metadata;
 
     // Step 2: Verify the metadata signature using the manufacturer's public key.
-    const isSignatureValid = verifySignature(firmwareHash, signature, manufacturerPubKeyPath);
+    const isSignatureValid = verifySignature(FirmwareFile, signature, manufacturerPubKeyPath);
     if (!isSignatureValid) {
       console.log("Firmware metadata signature verification failed. Aborting update.");
       return;
