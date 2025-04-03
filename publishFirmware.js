@@ -15,7 +15,7 @@ const Web3 = require("web3");
 
 // 1) Connect to Ganache
 // Make sure Ganache is running: "ganache" or the Ganache GUI
-const web3 = new Web3("http://192.168.1.3:7545");
+const web3 = new Web3("http://192.168.1.17:7545");
 
 // 2) Load the compiled contract artifacts from Truffle
 const contractJSON = JSON.parse(
@@ -32,7 +32,7 @@ const abi = contractJSON.abi;
  *
  * For simplicity, let's just hard-code the address or parse it manually
  */
-const contractAddress = "0xbaC9243aaB9879a0B80395A68349111F90028Ce8";
+const contractAddress = "";
 
 // Create a contract instance
 const firmwareRegistry = new web3.eth.Contract(abi, contractAddress);

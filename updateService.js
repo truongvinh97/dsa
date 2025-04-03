@@ -22,20 +22,20 @@ const mqtt = require("mqtt");
 // ----------- Configuration Section -----------
 
 // Ethereum configuration: connect to your Ethereum node (e.g., Ganache)
-const web3 = new Web3("http://192.168.1.3:7545");
+const web3 = new Web3("http://192.168.1.17:7545");
 
 // Load the compiled FirmwareRegistry contract artifact (from Truffle)
 const contractJSON = JSON.parse(fs.readFileSync("./build/contracts/FirmwareRegistry.json", "utf8"));
 const abi = contractJSON.abi;
-const contractAddress = "0xbaC9243aaB9879a0B80395A68349111F90028Ce8"; // Replace with your deployed contract address
+const contractAddress = ""; // Replace with your deployed contract address
 const firmwareRegistry = new web3.eth.Contract(abi, contractAddress);
 
 // Manufacturer's public key file (must be the correct public key, not the private key)
 const manufacturerPubKeyPath = "manufacturer_public_key.pem";
 
 // MQTT configuration: set the broker IP and topic
-const mqttBroker = "mqtt://192.168.1.12";  // Update as needed
-const mqttTopic = "ota/update";            // Topic for OTA update notifications
+const mqttBroker = "mqtt://192.168.1.13";  // Update as needed
+const mqttTopic = "test";            // Topic for OTA update notifications
 
 // IPFS gateway URL (ensure it’s accessible by the Pi; use LAN IP or a public gateway)
 const ipfsGateway = "https://ipfs.io/ipfs/";
@@ -162,7 +162,7 @@ function notifyDevice(version, cid, firmwareHash) {
   client.on("connect", () => {
     console.log("Connected to MQTT broker.");
     const message = JSON.stringify({
-      command: "FIRMWARE_UPDATE",
+      command: "OTA_IPFS",
       version: version,
       cid: cid,
       hash: firmwareHash
