@@ -27,7 +27,9 @@ const web3 = new Web3("http://192.168.1.17:7545");
 // Load the compiled FirmwareRegistry contract artifact (from Truffle)
 const contractJSON = JSON.parse(fs.readFileSync("./build/contracts/FirmwareRegistry.json", "utf8"));
 const abi = contractJSON.abi;
-const contractAddress = ""; // Replace with your deployed contract address
+const networkId = Object.keys(contractJSON.networks)[0];
+const contractAddress = contractJSON.networks[networkId].address;
+//const contractAddress = ""; // Replace with your deployed contract address
 const firmwareRegistry = new web3.eth.Contract(abi, contractAddress);
 
 // Manufacturer's public key file (must be the correct public key, not the private key)
@@ -205,7 +207,7 @@ async function main() {
       return;
     }
     // Destructure metadata (version, hash, cid, signature).
-    const { version, hash: metadataFirmwareHash, cid, signature } = metadata;
+    const { version, hash: metadataFirmwareHash, cid, signature, deviceType} = metadata;
 
     // Step 2: Download the firmware file from IPFS using the provided CID.
     const downloadSuccess = downloadFirmwareFromIPFS(cid, downloadedFirmwareFile);

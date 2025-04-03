@@ -32,7 +32,9 @@ const abi = contractJSON.abi;
  *
  * For simplicity, let's just hard-code the address or parse it manually
  */
-const contractAddress = "";
+//const contractAddress = "";
+const networkId = Object.keys(contractJSON.networks)[0];
+const contractAddress = contractJSON.networks[networkId].address;
 
 // Create a contract instance
 const firmwareRegistry = new web3.eth.Contract(abi, contractAddress);
@@ -77,11 +79,12 @@ async function publishFirmware() {
     // 5) Define a firmware version
     //    This can be anything like "0x0103" or a string "v1.0"
     const version = "0x0101";
+	const deviceType = "STMBoard";
 
     // Now call publishFirmware on the contract
     console.log("Publishing metadata to Ganache contract...");
     const tx = await firmwareRegistry.methods
-      .publishFirmware(version, firmwareHash, cid, signatureHex)
+      .publishFirmware(version, firmwareHash, cid, signatureHex, deviceType)
       .send({
         from: manufacturerAccount,
         gas: 2000000
