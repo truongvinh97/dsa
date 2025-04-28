@@ -2,9 +2,13 @@ import Web3 from "web3";
 import fs from "fs/promises";
 import dotenv from "dotenv"; dotenv.config();
 
-const RPC_URL = "http://192.168.1.24:7545";
+//const RPC_URL = "http://192.168.1.24:7545";
+//const web3 = new Web3(RPC_URL);
 
-const web3 = new Web3(RPC_URL);
+const RPC_URL = "ws://192.168.1.24:7545";
+const web3    = RPC_URL.startsWith("ws")
+  ? new Web3(new Web3.providers.WebsocketProvider(RPC_URL))
+  : new Web3(new Web3.providers.HttpProvider(RPC_URL));
 
 let Firmware, Device;
 
