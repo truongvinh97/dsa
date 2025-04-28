@@ -8,7 +8,6 @@ import { Firmware, Device }    from "../web3/index.js";
 import { downloadFile }        from "../lib/ipfs.js";
 import { decryptForDevice }    from "./decrypt.js";
 import { publishUpdate }       from "../mqtt/client.js";
-import { getDeviceList }       from "../web3/devices.js"; // optional if custom device fetch
 import dotenv from "dotenv"; dotenv.config();
 
 /**

@@ -9,7 +9,6 @@
 import crypto         from "crypto";
 import * as secp      from "@noble/secp256k1";
 import { etc, sign, verify, getPublicKey } from '@noble/secp256k1';
-import * as eciesGeth from "ecies-geth";          // tiny wrapper ─ same algo geth uses
 
 /* small helpers ---------------------------------------------------- */
 const hex  = secp.utils.bytesToHex;

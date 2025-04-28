@@ -4,7 +4,7 @@
 // -----------------------------
 
 import { sha256, aesGcmDecrypt, eciesDecrypt } from "../lib/crypto.js";
-import { getWrappedKey }                       from "../lib/key-service.js";
+import { getWrappedKey }                       from "../lib/key_service.js";
 import fs from "fs/promises";
 
 /**
