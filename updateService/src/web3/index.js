@@ -2,7 +2,9 @@ import Web3 from "web3";
 import fs from "fs/promises";
 import dotenv from "dotenv"; dotenv.config();
 
-const web3 = new Web3(process.env.RPC_URL);
+const RPC_URL = "http://192.168.1.24:7545";
+
+const web3 = new Web3(RPC_URL);
 
 let Firmware, Device;
 

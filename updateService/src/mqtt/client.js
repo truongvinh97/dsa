@@ -8,6 +8,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 let client; // sẽ gán sau khi connect
+const MQTT_URL = "mqtt://192.168.1.12:1883";
 
 /**
  * Kết nối MQTT broker.
@@ -15,14 +16,14 @@ let client; // sẽ gán sau khi connect
  */
 export async function connectMQTT() {
   return new Promise((resolve, reject) => {
-    client = mqtt.connect(process.env.MQTT_URL, {
+    client = mqtt.connect(MQTT_URL, {
       reconnectPeriod: 2000,          // Thử reconnect mỗi 2s
       keepalive: 60,                  // Ping broker mỗi 60s
       clientId: `ota-gateway-${Math.floor(Math.random() * 10000)}`,
     });
 
     client.on("connect", () => {
-      console.log(`[MQTT] Connected to broker at ${process.env.MQTT_URL}`);
+      console.log(`[MQTT] Connected to broker at ${MQTT_URL}`);
       resolve(); // báo main() đã kết nối xong
     });
 
