@@ -8,6 +8,7 @@ dotenv.config(); // Load .env trước tiên
 
 import { connectMQTT } from "./mqtt/client.js";
 import startDispatcher from "./core/dispatcher.js";
+import { initWeb3 } from "./web3/index.js";
 
 /**
  * Hàm khởi động hệ thống chính
@@ -22,6 +23,7 @@ async function main() {
     console.log("[UpdateService] MQTT connected successfully.");
 
     // 2. Khởi động Dispatcher để lắng nghe sự kiện NewFirmware
+    await initWeb3();
     await startDispatcher();
 
     console.log("✅ [UpdateService] Service is up and running.");
