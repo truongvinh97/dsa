@@ -6,7 +6,7 @@
 
 import axios from "axios";
 
-const baseURL = process.env.KEY_SERVICE; // e.g. http://192.168.1.24:4000/api/v1/keys
+const baseURL = "http://192.168.1.24:4000/api/v1/keys";//process.env.KEY_SERVICE; // e.g. http://192.168.1.24:4000/api/v1/keys
 
 if (!baseURL) {
   throw new Error("[KeyService] Missing KEY_SERVICE env variable");
