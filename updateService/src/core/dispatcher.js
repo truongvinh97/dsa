@@ -45,18 +45,18 @@ export default async function startDispatcher() {
 
         try {
           // (4) Query full metadata (keyID, signature, hash, deviceType) from the smart contract
-          const fwMeta = await Firmware.methods.getFirmware(meta.version).call();
-          const fullMeta = { ...fwMeta, version: meta.version };
+          // const fwMeta = await Firmware.methods.getFirmware(meta.version).call();
+          // const fullMeta = { ...fwMeta, version: meta.version };
 
           // (5) Download the encrypted firmware package from IPFS
-          const cipherPkg = await downloadFile(fullMeta.cid);
+          const cipherPkg = await downloadFile(meta.cid);
 
           // (6) Get all registered devices
           const devices = await Device.methods.getAllDevices().call();
 
           // (7) Filter devices matching the required deviceType
           const targets = devices
-            .filter(d => d.deviceType === fullMeta.deviceType)
+            .filter(d => d.deviceType === meta.deviceType)
             .map(d => ({
               deviceId: d.deviceId,
               pubKey: d.pubKey,
@@ -64,7 +64,7 @@ export default async function startDispatcher() {
             }));
 
           if (targets.length === 0) {
-            console.warn(`[Dispatcher] ⚠️ No devices found for deviceType=${fullMeta.deviceType}`);
+            console.warn(`[Dispatcher] ⚠️ No devices found for deviceType=${meta.deviceType}`);
             continue;
           }
 
@@ -72,14 +72,14 @@ export default async function startDispatcher() {
           let success = 0;
           for (const dev of targets) {
             try {
-              await decryptForDevice(fullMeta, cipherPkg, dev);
+              await decryptForDevice(meta, cipherPkg, dev);
 
               // Publish an OTA_START command via MQTT
               publishUpdate(dev.deviceId, {
                 command: "OTA_START",
-                version: fullMeta.version,
-                keyID: fullMeta.keyID,
-                CID: fullMeta.cid,
+                version: meta.version,
+                keyID: meta.keyID,
+                CID: meta.cid,
               });
 
               success++;
