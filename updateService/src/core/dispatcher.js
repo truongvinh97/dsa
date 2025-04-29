@@ -33,7 +33,7 @@ export default async function startDispatcher() {
 
       // (2) Query all NewFirmware events from lastBlock + 1 to currentBlock
       const events = await Firmware.getPastEvents("NewFirmware", {
-        fromBlock: lastBlock + 1,
+        fromBlock: lastBlock + 1n,
         toBlock: currentBlock
       });
 
