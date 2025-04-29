@@ -25,7 +25,7 @@ export async function uploadFile(buffer) {
   return cidStr;
 }
 
-// 3. Download from gateway (ipfs.io or overridden)
+//3. Download from public gateway (with proper headers)
 export async function downloadFile(cid) {
   const gateway = process.env.IPFS_GATEWAY || "https://ipfs.io/ipfs";
   const url = `${gateway}/${cid}`;
@@ -33,7 +33,13 @@ export async function downloadFile(cid) {
   console.debug("[IPFS] Downloading from:", url);
 
   try {
-    const res = await axios.get(url, { responseType: "arraybuffer" });
+    const res = await axios.get(url, {
+      responseType: "arraybuffer",
+      headers: {
+        "User-Agent": "Mozilla/5.0" // <== thêm dòng này
+      }
+    });
+
     const buf = Buffer.from(res.data);
     console.debug("[IPFS] Downloaded", buf.length, "bytes");
     return buf;
@@ -42,3 +48,4 @@ export async function downloadFile(cid) {
     throw new Error(`Failed to download from IPFS gateway: ${url}`);
   }
 }
+
