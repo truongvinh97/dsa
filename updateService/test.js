@@ -26,7 +26,7 @@ async function main() {
     const latestBlock = await web3.eth.getBlockNumber();
     if (latestBlock > lastBlock) {
       const events = await contract.getPastEvents("NewFirmware", {
-        fromBlock: lastBlock + 1,
+        fromBlock: lastBlock + 1n,
         toBlock: "latest"
       });
 
