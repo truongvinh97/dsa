@@ -1,47 +1,60 @@
 // src/core/dispatcher.js
-// ------------------------------------------------------------------
-// Lắng nghe sự kiện NewFirmware(version) từ smart contract,
-// xử lý phân phối OTA nếu firmware hợp lệ
-// ------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// Dispatcher (Polling Version) - For HTTP-only RPC (e.g., Ganache GUI)
+// Periodically queries the blockchain for new firmware release events.
+// -----------------------------------------------------------------------------
 
 import { Firmware, Device } from "../web3/index.js";
 import { downloadFile } from "../lib/ipfs.js";
 import { decryptForDevice } from "./decrypt.js";
 import { publishUpdate } from "../mqtt/client.js";
 import dotenv from "dotenv";
+import Web3 from "web3";
 dotenv.config();
 
+// Create a Web3 instance for RPC connection
+const web3 = new Web3(process.env.RPC_URL);
+
+// Initialize block tracking
+let lastBlock = await web3.eth.getBlockNumber();
+
 /**
- * Khởi động dispatcher — đăng ký lắng nghe sự kiện NewFirmware
+ * Start the dispatcher service:
+ * Periodically polls for NewFirmware events every 2 seconds,
+ * validates the firmware, and dispatches updates to target devices.
  */
 export default async function startDispatcher() {
-  console.log("[Dispatcher] Initializing subscription to NewFirmware events...");
+  console.log("[Dispatcher] Polling NewFirmware events...");
 
-  try {
-    // (B0) Kiểm tra contract instance
-    const subscription = Firmware.events.NewFirmware();
-    if (!subscription || typeof subscription.subscribe !== "function") {
-      throw new Error("Firmware contract instance is invalid or not using WebSocket provider!");
-    }
+  setInterval(async () => {
+    try {
+      // (1) Get the latest block number
+      const currentBlock = await web3.eth.getBlockNumber();
 
-    // (B1) Đăng ký lắng nghe event NewFirmware
-    subscription.subscribe({
-      // (B2) Khi có sự kiện mới phát hành firmware
-      next: async (event) => {
+      // (2) Query all NewFirmware events from lastBlock + 1 to currentBlock
+      const events = await Firmware.getPastEvents("NewFirmware", {
+        fromBlock: lastBlock + 1,
+        toBlock: currentBlock
+      });
+
+      // (3) Process each new firmware event
+      for (const event of events) {
         const meta = event.returnValues;
-        console.log(`[Dispatcher] 📦 NewFirmware: version=${meta.version}, CID=${meta.CID}`);
+        console.log(`[Dispatcher] 📦 NewFirmware detected: version=${meta.version}, CID=${meta.CID}`);
 
         try {
-          // (B3) Truy vấn metadata đầy đủ từ smart contract
+          // (4) Query full metadata (keyID, signature, hash, deviceType) from the smart contract
           const fwMeta = await Firmware.methods.getFirmware(meta.version).call();
           const fullMeta = { ...fwMeta, version: meta.version };
 
-          // (B4) Tải firmware mã hóa từ IPFS
+          // (5) Download the encrypted firmware package from IPFS
           const cipherPkg = await downloadFile(fullMeta.CID);
 
-          // (B5) Truy vấn danh sách thiết bị thuộc deviceType tương ứng
-          const allDevices = await Device.methods.getAllDevices().call();
-          const targets = allDevices
+          // (6) Get all registered devices
+          const devices = await Device.methods.getAllDevices().call();
+
+          // (7) Filter devices matching the required deviceType
+          const targets = devices
             .filter(d => d.deviceType === fullMeta.deviceType)
             .map(d => ({
               deviceId: d.deviceId,
@@ -50,16 +63,17 @@ export default async function startDispatcher() {
             }));
 
           if (targets.length === 0) {
-            console.warn(`[Dispatcher] ⚠️ No devices found for type ${fullMeta.deviceType}`);
-            return;
+            console.warn(`[Dispatcher] ⚠️ No devices found for deviceType=${fullMeta.deviceType}`);
+            continue;
           }
 
-          // (B6) Lặp qua từng thiết bị để gửi lệnh OTA nếu giải mã thành công
+          // (8) Attempt to decrypt and publish the update to each device
           let success = 0;
           for (const dev of targets) {
             try {
               await decryptForDevice(fullMeta, cipherPkg, dev);
 
+              // Publish an OTA_START command via MQTT
               publishUpdate(dev.deviceId, {
                 command: "OTA_START",
                 version: fullMeta.version,
@@ -69,23 +83,23 @@ export default async function startDispatcher() {
 
               success++;
             } catch (err) {
-              console.warn(`[Dispatcher] ❌ Decryption failed for ${dev.deviceId}:`, err.message);
+              console.warn(`[Dispatcher] ❌ Failed to decrypt or dispatch for ${dev.deviceId}:`, err.message);
             }
           }
 
-          // (B7) Log tổng kết
-          console.log(`[Dispatcher] ✅ Firmware ${fullMeta.version} dispatched to ${success}/${targets.length} devices.`);
-        } catch (err) {
-          console.error("[Dispatcher] ❌ Firmware processing failed:", err.message);
-        }
-      },
+          // (9) Log the dispatch result
+          console.log(`[Dispatcher] ✅ Firmware ${meta.version} dispatched to ${success}/${targets.length} devices.`);
 
-      // (B8) Nếu có lỗi khi lắng nghe sự kiện
-      error: (err) => {
-        console.error("[Dispatcher] 🔥 Subscription error:", err.message);
+        } catch (err) {
+          console.error("[Dispatcher] ❌ Error processing firmware event:", err.message);
+        }
       }
-    });
-  } catch (err) {
-    console.error("[Dispatcher] ❌ Dispatcher setup failed:", err.message);
-  }
+
+      // (10) Update last processed block number
+      lastBlock = currentBlock;
+
+    } catch (err) {
+      console.error("[Dispatcher] 🔥 Polling error:", err.message);
+    }
+  }, 2000); // Poll every 2 seconds
 }
