@@ -20,7 +20,7 @@ async function loadABI(name) {
 
 async function contract(name, envAddr) {
   const artifact = await loadABI(name);
-  const addr = process.env[envAddr] || Object.values(artifact.networks)[0]?.address;
+  const addr = Object.values(artifact.networks)[0]?.address;
   console.log("[WEB3] Address:", addr);
   if (!addr) throw new Error(`Missing contract address for ${name}`);
   return new web3.eth.Contract(artifact.abi, addr);

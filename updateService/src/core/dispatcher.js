@@ -41,7 +41,7 @@ export default async function startDispatcher() {
       // (3) Process each new firmware event
       for (const event of events) {
         const meta = event.returnValues;
-        console.log(`[Dispatcher] 📦 NewFirmware detected: version=${meta.version}, CID=${meta.CID}`);
+        console.log(`[Dispatcher] 📦 NewFirmware detected: version=${meta.version}, CID=${meta.cid}`);
 
         try {
           // (4) Query full metadata (keyID, signature, hash, deviceType) from the smart contract
