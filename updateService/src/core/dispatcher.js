@@ -13,7 +13,8 @@ import Web3 from "web3";
 dotenv.config();
 
 // Create a Web3 instance for RPC connection
-const web3 = new Web3(process.env.RPC_URL);
+const RPC_URL = "ws://192.168.1.24:7545";
+const web3 = new Web3(RPC_URL);
 
 // Initialize block tracking
 let lastBlock = await web3.eth.getBlockNumber();
@@ -101,5 +102,5 @@ export default async function startDispatcher() {
     } catch (err) {
       console.error("[Dispatcher] 🔥 Polling error:", err.message);
     }
-  }, 5000); // Poll every 2 seconds
+  }, 2000); // Poll every 2 seconds
 }
