@@ -101,5 +101,5 @@ export default async function startDispatcher() {
     } catch (err) {
       console.error("[Dispatcher] 🔥 Polling error:", err.message);
     }
-  }, 2000); // Poll every 2 seconds
+  }, 5000); // Poll every 2 seconds
 }
