@@ -49,7 +49,7 @@ export default async function startDispatcher() {
           const fullMeta = { ...fwMeta, version: meta.version };
 
           // (5) Download the encrypted firmware package from IPFS
-          const cipherPkg = await downloadFile(fullMeta.CID);
+          const cipherPkg = await downloadFile(fullMeta.cid);
 
           // (6) Get all registered devices
           const devices = await Device.methods.getAllDevices().call();
@@ -79,7 +79,7 @@ export default async function startDispatcher() {
                 command: "OTA_START",
                 version: fullMeta.version,
                 keyID: fullMeta.keyID,
-                CID: fullMeta.CID,
+                CID: fullMeta.cid,
               });
 
               success++;
