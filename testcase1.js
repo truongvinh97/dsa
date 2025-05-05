@@ -40,7 +40,7 @@ function stats(arr) {
 }
 
 (async function main() {
-  console.log(`Bắt đầu mô phỏng ${ITERATIONS} chu trình OTA...\n`);
+  console.log(`Starting ${ITERATIONS} OTA cycle...\n`);
 
   for (let i = 1; i <= ITERATIONS; i++) {
     // 1. t_pub
@@ -83,7 +83,7 @@ function stats(arr) {
   }
 
   // In báo cáo cuối
-  console.log(`\n=== KẾT QUẢ SAU ${ITERATIONS} CHU TRÌNH ===`);
+  console.log(`\n=== Result of ${ITERATIONS} OTA cycle ===`);
   console.log(`Param       Min (ms)  Max (ms)   Mean ± σ (ms)`);
   for (const key of ['t_pub','t_dl','t_flash','t_reboot','t_rep','T_E2E']) {
     const arr = metrics[key];
