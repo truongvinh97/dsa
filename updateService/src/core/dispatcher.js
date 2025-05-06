@@ -13,7 +13,8 @@ import Web3 from "web3";
 dotenv.config();
 
 // Create a Web3 instance for RPC connection
-const RPC_URL = "ws://192.168.1.24:7545";
+const RPC_URL = process.env.RPC_URL || "ws://192.168.1.24:7545";
+const DEVICE_KEY_DIR = process.env.DEVICE_KEY_DIR || "/etc/ota/keys";
 const web3 = new Web3(RPC_URL);
 
 // Initialize block tracking
@@ -56,11 +57,11 @@ export default async function startDispatcher() {
 
           // (7) Filter devices matching the required deviceType
           const targets = devices
-            .filter(d => d.deviceType === meta.deviceType)
+            .filter(d => d.deviceId === meta.deviceType)
             .map(d => ({
               deviceId: d.deviceId,
               pubKey: d.pubKey,
-              privPath: `${process.env.DEVICE_KEY_DIR}/${d.deviceId}.priv`,
+              privPath: `${DEVICE_KEY_DIR}/${d.deviceId}.priv`,
             }));
 
           if (targets.length === 0) {
