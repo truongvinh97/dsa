@@ -8,7 +8,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 let client; // sẽ gán sau khi connect
-const MQTT_URL = "mqtt://192.168.1.12:1883";
+const MQTT_URL = process.env.MQTT_URL || "mqtt://192.168.1.12:1883";
 
 /**
  * Kết nối MQTT broker.
