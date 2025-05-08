@@ -38,6 +38,8 @@ export async function decryptForDevice(meta, cipherPkg, device) {
   const cipher = cipherPkg.subarray(28);
 
   // 2. Get encrypted AES key from Key-Service
+  console.log(`[Decrypt] Pubkey ${device.pubKey}`);
+  console.log(`[Decrypt] KeyID ${device.keyID}`);
   const wrappedKey = await getWrappedKey(meta.keyID, device.pubKey);  // Buffer
 
   // 3. Read private key from file
