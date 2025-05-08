@@ -10,6 +10,7 @@ import { decryptForDevice } from "./decrypt.js";
 import { publishUpdate } from "../mqtt/client.js";
 import dotenv from "dotenv";
 import Web3 from "web3";
+import devicesConfig from "./DeviceConfiguration.json" assert { type: "json" };
 dotenv.config();
 
 // Create a Web3 instance for RPC connection
@@ -32,6 +33,7 @@ export default async function startDispatcher() {
     try {
       // (1) Get the latest block number
       const currentBlock = await web3.eth.getBlockNumber();
+      const devicesconfig = devicesConfig;
 
       // (2) Query all NewFirmware events from lastBlock + 1 to currentBlock
       const events = await Firmware.getPastEvents("NewFirmware", {
@@ -57,11 +59,11 @@ export default async function startDispatcher() {
 
           // (7) Filter devices matching the required deviceType
           const targets = devices
-            .filter(d => d.deviceId === meta.deviceType)
+            .filter(d => d.deviceId === meta.deviceType && devicesconfig.autoUpdate === true)
             .map(d => ({
               deviceId: d.deviceId,
-              pubKey: d.pubKey,
-              privPath: `${DEVICE_KEY_DIR}/${d.deviceId}.priv`,
+              pubKey: devicesconfig.pubKey,
+              privPath: devicesconfig.privPath;//`${DEVICE_KEY_DIR}/${d.deviceId}.priv`,
             }));
 
           if (targets.length === 0) {
@@ -73,7 +75,7 @@ export default async function startDispatcher() {
           let success = 0;
           for (const dev of targets) {
             try {
-              await decryptForDevice(meta, cipherPkg, dev);
+              await decryptForDevice(meta, cipherPkg, devicesconfig);
 
               // Publish an OTA_START command via MQTT
               publishUpdate(dev.deviceId, {
