@@ -64,7 +64,7 @@ export default async function startDispatcher() {
 
           // (7) Filter devices matching the required deviceType
           const targets = devices
-            .filter(d => d.deviceId === meta.deviceType && devicesconfig.autoUpdate === true)
+            .filter(d => d.deviceId === meta.deviceType)//&& devicesconfig.autoUpdate === true
             .map(d => ({
               deviceId: d.deviceId,
               pubKey: devicesconfig.pubKey,
