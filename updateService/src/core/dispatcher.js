@@ -11,13 +11,10 @@ import { publishUpdate } from "../mqtt/client.js";
 import dotenv from "dotenv";
 import Web3 from "web3";
 import fs from "fs";
-import path from "path";
 
+const configUrl = new URL("./DeviceConfiguration.json", import.meta.url);
 const devicesConfig = JSON.parse(
-  fs.readFileSync(
-    path.resolve(new URL(import.meta.url).pathname, "DeviceConfiguration.json"),
-    "utf8"
-  )
+  fs.readFileSync(configUrl, "utf8")
 );
 
 dotenv.config();
