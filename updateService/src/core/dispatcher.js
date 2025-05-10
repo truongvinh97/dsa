@@ -117,17 +117,20 @@ for (const dev of targets) {
     console.log(`[Dispatcher] ✅ OTA_START sent to ${dev.deviceId}`);
 
     // --- Dummy bước 8: chờ 4s rồi report lên chain ---
-    console.log(`[Dispatcher] ⏳ Waiting to simulate OTA for ${dev.deviceId}...`);
-    await new Promise(res => setTimeout(res, 4000));
+    // build transaction call
+const tx = Device.methods.updateDeviceStatus(dev.deviceId, meta.version);
 
-    console.log(`[Dispatcher] 📡 Reporting updateDeviceStatus for ${dev.deviceId} to on-chain...`);
-    // from: bạn có thể dùng env.GATEWAY_ADDR hoặc web3.eth.defaultAccount
-    const gatewayAddr = "0x2bb01dcE078bd56565ef51C45b34A05Ae869Ab2c";
-    const receipt = await Device.methods
-      .updateDeviceStatus(dev.deviceId, meta.version)
-      .send({ from: gatewayAddr });
+// estimate gas
+const gas = await tx.estimateGas({ from: gatewayAddr });
+console.log(`[Dispatcher] ℹ️ Estimated gas: ${gas}`);
 
-    console.log(`[Dispatcher] ✅ Report txHash: ${receipt.transactionHash}`);
+// send with explicit gas limit
+const receipt = await tx.send({
+  from: gatewayAddr,
+  gas: gas + 10000  // thêm chút buffer
+});
+
+console.log(`[Dispatcher] ✅ Reported on‐chain: txHash=${receipt.transactionHash}`);
     // ----------------------------------------------
 
     success++;
