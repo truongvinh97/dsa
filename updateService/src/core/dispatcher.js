@@ -117,6 +117,9 @@ for (const dev of targets) {
     console.log(`[Dispatcher] ✅ OTA_START sent to ${dev.deviceId}`);
 
     // --- Dummy bước 8: chờ 4s rồi report lên chain ---
+    console.log(`[Dispatcher] ⏳ Waiting to simulate OTA for ${dev.deviceId}...`);
+    await new Promise(res => setTimeout(res, 4000));
+
     // build transaction call
 const tx = Device.methods.updateDeviceStatus(dev.deviceId, meta.version);
 
@@ -130,8 +133,6 @@ const receipt = await tx.send({
   from: gatewayAddr,
   gas: gas + 10000n  // thêm chút buffer
 });
-
-console.log(`[Dispatcher] ✅ Reported on‐chain: txHash=${receipt.transactionHash}`);
     // ----------------------------------------------
 
     success++;
