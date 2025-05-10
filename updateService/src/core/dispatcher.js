@@ -11,15 +11,11 @@ import { publishUpdate } from "../mqtt/client.js";
 import dotenv from "dotenv";
 import Web3 from "web3";
 import { fileURLToPath } from "url";
-import fs from "fs";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
 
-// Tạo URL đến JSON config theo đường dẫn tương đối so với dispatcher.js
-const configUrl = new URL("./DeviceConfiguration.json", import.meta.url);
-
-// Đọc trực tiếp từ URL
-const devicesConfig = JSON.parse(
-  fs.readFileSync(configUrl, "utf8")
-);
+// file DeviceConfiguration.json nằm cùng thư mục với dispatcher.js
+const devicesConfig = require("./DeviceConfiguration.json");
 
 dotenv.config();
 
