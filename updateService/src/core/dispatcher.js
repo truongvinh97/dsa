@@ -10,12 +10,11 @@ import { decryptForDevice } from "./decrypt.js";
 import { publishUpdate } from "../mqtt/client.js";
 import dotenv from "dotenv";
 import Web3 from "web3";
-import { fileURLToPath } from "url";
 import { createRequire } from "module";
-const require = createRequire(import.meta.url);
 
-// file DeviceConfiguration.json nằm cùng thư mục với dispatcher.js
-const devicesConfig = require("./DeviceConfiguration.json");
+const require = createRequire(import.meta.url);
+// Đảm bảo tên file và đường dẫn match – đây là “DeviceConfiguration.json”
+const devicesConfig = require("./home/vinh/thesis/test/dsa/updateService/src/core/DeviceConfiguration.json");
 
 dotenv.config();
 
