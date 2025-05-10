@@ -16,3 +16,6 @@ sudo apt update
 sudo apt install -y git curl build-essential
 
 /etc/systemd/system/ota-update.service
+
+fw contract: 0xE9f1A121627Ff693f200BEFf32414fdd2E90624d
+dv contract: 0xa559fc8e1Cc07f0d979D1B8Be59D4cbE21897eF3

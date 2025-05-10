@@ -1,0 +1,14 @@
+[
+  {
+    "deviceId":   "dev1",
+    "pubKey":  "04A1B2C3…",
+    "privPath":   "./keys/dev1/manufacturer_priv.pem",
+    "autoUpdate": true          
+  },
+  {
+    "deviceId":   "dev2",
+    "pubKey":  "5a80f1d3fe250fde1d849f1b7af0265de15cef745ad0aa936665c1b70cec3beae4010519d63e3bb586dd27e149f25fd4b37ecbb96685f42f5af75a1180",
+    "privPath":   "./keys/dev2/manufacturer_priv.pem",
+    "autoUpdate": true
+  }
+]
