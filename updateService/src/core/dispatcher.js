@@ -76,6 +76,7 @@ export default async function startDispatcher() {
             continue;
           }
 
+          /*
           // (8) Attempt to decrypt and publish the update to each device
           let success = 0;
           for (const dev of targets) {
@@ -98,6 +99,42 @@ export default async function startDispatcher() {
 
           // (9) Log the dispatch result
           console.log(`[Dispatcher] ✅ Firmware ${meta.version} dispatched to ${success}/${targets.length} devices.`);
+          */
+
+          // (8) Attempt to decrypt and publish the update to each device (dummy)
+let success = 0;
+for (const dev of targets) {
+  try {
+    console.log(`[Decrypt] OK: firmware version ${meta.version}, size=6144 bytes`);
+
+    // Publish an OTA_START command via MQTT
+    await publishUpdate(dev.deviceId, {
+      command: "OTA_START",
+      version: meta.version,
+      keyID:   meta.keyID,
+      CID:     meta.cid,
+    });
+    console.log(`[Dispatcher] ✅ OTA_START sent to ${dev.deviceId}`);
+
+    // --- Dummy bước 8: chờ 4s rồi report lên chain ---
+    console.log(`[Dispatcher] ⏳ Waiting to simulate OTA for ${dev.deviceId}...`);
+    await new Promise(res => setTimeout(res, 4000));
+
+    console.log(`[Dispatcher] 📡 Reporting updateDeviceStatus for ${dev.deviceId} to on-chain...`);
+    // from: bạn có thể dùng env.GATEWAY_ADDR hoặc web3.eth.defaultAccount
+    const gatewayAddr = "0x2bb01dcE078bd56565ef51C45b34A05Ae869Ab2c";
+    const receipt = await Device.methods
+      .updateDeviceStatus(dev.deviceId, meta.version)
+      .send({ from: gatewayAddr });
+
+    console.log(`[Dispatcher] ✅ Report txHash: ${receipt.transactionHash}`);
+    // ----------------------------------------------
+
+    success++;
+  } catch (err) {
+    console.warn(`[Dispatcher] ❌ Failed for ${dev.deviceId}:`, err.message);
+  }
+}
 
         } catch (err) {
           console.error("[Dispatcher] ❌ Error processing firmware event:", err.message);
