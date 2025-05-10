@@ -128,7 +128,7 @@ console.log(`[Dispatcher] ℹ️ Estimated gas: ${gas}`);
 // send with explicit gas limit
 const receipt = await tx.send({
   from: gatewayAddr,
-  gas: gas + 10000  // thêm chút buffer
+  gas: gas + 10000n  // thêm chút buffer
 });
 
 console.log(`[Dispatcher] ✅ Reported on‐chain: txHash=${receipt.transactionHash}`);
