@@ -72,7 +72,7 @@ export default async function startDispatcher() {
             .map(d => ({
               deviceId: d.deviceId,
               pubKey: devicesconfig.pubKey,
-              privPath: devicesconfig.privPath;//`${DEVICE_KEY_DIR}/${d.deviceId}.priv`,
+              privPath: devicesconfig.privPath,//`${DEVICE_KEY_DIR}/${d.deviceId}.priv`,
             }));
 
           if (targets.length === 0) {
