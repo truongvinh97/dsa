@@ -10,7 +10,16 @@ import { decryptForDevice } from "./decrypt.js";
 import { publishUpdate } from "../mqtt/client.js";
 import dotenv from "dotenv";
 import Web3 from "web3";
-import devicesConfig from "./DeviceConfiguration.json" assert { type: "json" };
+import fs from "fs";
+import path from "path";
+
+const devicesConfig = JSON.parse(
+  fs.readFileSync(
+    path.resolve(new URL(import.meta.url).pathname, "DeviceConfiguration.json"),
+    "utf8"
+  )
+);
+
 dotenv.config();
 
 // Create a Web3 instance for RPC connection
