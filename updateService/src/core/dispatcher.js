@@ -121,6 +121,7 @@ for (const dev of targets) {
 const tx = Device.methods.updateDeviceStatus(dev.deviceId, meta.version);
 
 // estimate gas
+const gatewayAddr = "0x2bb01dcE078bd56565ef51C45b34A05Ae869Ab2c";
 const gas = await tx.estimateGas({ from: gatewayAddr });
 console.log(`[Dispatcher] ℹ️ Estimated gas: ${gas}`);
 
