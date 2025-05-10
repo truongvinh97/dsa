@@ -10,11 +10,18 @@ import { decryptForDevice } from "./decrypt.js";
 import { publishUpdate } from "../mqtt/client.js";
 import dotenv from "dotenv";
 import Web3 from "web3";
-import fs from "fs";
+import fs   from "fs";
+import path from "path";
 
-const configUrl = new URL("./DeviceConfiguration.json", import.meta.url);
+// __dirname tương đương với folder của dispatcher.js
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+
+// Đọc file JSON nằm ngay trong src/core
 const devicesConfig = JSON.parse(
-  fs.readFileSync(configUrl, "utf8")
+  fs.readFileSync(
+    path.join(__dirname, "DeviceConfiguration.json"),  // <-- không ../
+    "utf8"
+  )
 );
 
 dotenv.config();
