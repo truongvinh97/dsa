@@ -14,7 +14,7 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 // Đảm bảo tên file và đường dẫn match – đây là “DeviceConfiguration.json”
-const devicesConfig = require("./home/vinh/thesis/test/dsa/updateService/src/core/DeviceConfiguration.json");
+const devicesConfig = require("./DeviceConfiguration.json");
 
 dotenv.config();
 
