@@ -7,6 +7,8 @@ import * as ecies from "ecies-geth";
 // keccak256 để sinh keyID giống trên chain
 import { keccak256 } from "ethers";
 
+import { getPublicKey } from "@noble/secp256k1";
+
 dotenv.config();
 
 // ── 1) Đọc env ─────────────────────────────────────────────────────
@@ -27,6 +29,12 @@ const MASTER_SECRET = Buffer.from(
   MASTER_SECRET_HEX.replace(/^0x/, ""),
   "hex"
 );
+
+const priv = WRAP_PRIV_HEX.replace(/^0x/, "");
+const expectedPub = "0x" + Buffer.from(getPublicKey(priv, false)).toString("hex");
+
+console.log("Expected pub:", expectedPub);
+console.log("Actual pub  :", WRAP_PUB_HEX);
 
 
 /**
