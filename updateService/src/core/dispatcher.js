@@ -6,13 +6,13 @@ dotenv.config();
 import Web3 from "web3";
 import { createRequire } from "module";
 import mqttClient from "../mqtt/client.js";
-import { sendTx } from "../services/web3.service.js";
 
 import {
   web3,
   Firmware,
   Device,
-  KeyRegistry
+  KeyRegistry,
+  sendTx
 } from "../web3/index.js";
 
 import { downloadFile } from "../lib/ipfs.js";

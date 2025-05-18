@@ -60,3 +60,41 @@ export async function initWeb3() {
 
   console.log("[web3] using default account", _defaultAccount);
 }
+
+/**
+ * sendTx – send a web3 contract method with sensible defaults
+ *
+ * @param {object} method  – web3.eth.Contract method (e.g. contract.methods.myFunc(...))
+ * @param {object} opts    – optional overrides:
+ *                            - from: string (sender address)
+ *                            - gas:  number | BigInt
+ *                            - value:number | BigInt
+ * @returns {Promise<object>} – resolves to the receipt
+ */
+export async function sendTx(method, opts = {}) {
+  // 1) determine from
+  const from = opts.from
+    ? opts.from
+    : (await web3.eth.getAccounts())[0];
+  // 2) estimate gas if missing
+  const gas = opts.gas != null
+    ? opts.gas
+    : await method.estimateGas({ from, value: opts.value ?? 0 });
+  // 3) value default
+  const value = opts.value ?? 0;
+
+  // 4) build tx options (hex-encoded)
+  const txOpts = {
+    from,
+    gas:   web3.utils.toHex(gas),
+    value: web3.utils.toHex(value)
+  };
+
+  // 5) send and await receipt
+  return new Promise((resolve, reject) => {
+    method
+      .send(txOpts)
+      .once("receipt", resolve)
+      .once("error", reject);
+  });
+}
