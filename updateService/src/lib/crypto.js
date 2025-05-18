@@ -100,11 +100,16 @@ export function eciesEncrypt(pubHex, data) {
 
 /**
  * ECIES decrypt (for unwrapping session-key)
- * @param {string} privHex    0x-prefixed EC private key
+ * @param {string|Buffer} privHex    0x-prefixed EC private key
  * @param {Buffer} encrypted
- * @returns {Buffer}           plaintext
+ * @returns {Buffer}                 plaintext
  */
 export function eciesDecrypt(privHex, encrypted) {
-  const priv = Buffer.from(privHex.replace(/^0x/, ""), "hex");
+  const privStr = Buffer.isBuffer(privHex)
+    ? privHex.toString("hex")
+    : String(privHex).replace(/^0x/, "");
+
+  const priv = Buffer.from(privStr, "hex");
   return ecies.decrypt(priv, encrypted);
 }
+
