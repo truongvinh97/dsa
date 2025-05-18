@@ -78,7 +78,7 @@ async function processNewFirmware({
 
   try {
 
-    const mfBuf       = await downloadFile(`${cid}/manifest.json`);
+    const mfBuf       = await downloadFile(`${cid}`);
     const {version: manifestVersion, cidWrap, cidCipher } = JSON.parse(mfBuf.toString());
     
     // 1️⃣ derive group‐key & verify keyID
