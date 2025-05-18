@@ -71,44 +71,20 @@ export default async function startDispatcher() {
  * - decrypt + verify
  * - publish MQTT OTA_START
  */
-async function processNewFirmware(evt) {
-  // 0) Đọc event
-  const {
-    version: versionHash,  // đây là indexed string, không dùng để derive
-    cid,
-    keyID,
-    hash,
-    signature,
-    deviceType
-  } = evt.returnValues;
-
-  console.log(
-    `\n[Dispatcher] 🔔 NewFirmware versionHash=${versionHash} type=${deviceType} CID=${cid}`
-  );
+async function processNewFirmware({
+  cid, keyID, hash, signature, deviceType
+}) {
+  console.log(`\n[Dispatcher] 🔔 NewFirmware v=${version} type=${deviceType} CID=${cid}`);
 
   try {
-    // 1) Lấy nguyên list firmware trên chuỗi
-    const allFW = await Firmware.methods.getAllFirmwares().call();
 
-    // 2) Tìm bản ghi metadata khớp hash & keyID
-    const fw = allFW.find(f =>
-      f.hash.toLowerCase()  === hash.toLowerCase()  &&
-      f.keyID.toLowerCase() === keyID.toLowerCase()
-    );
-    if (!fw) {
-      throw new Error(`Cannot recover original version for hash=${hash}`);
-    }
-
-    // 3) Lấy version gốc
-    const origVersion = fw.version;  // Ví dụ "0x0101"
-
-    // 4) Bây giờ derive khoá đúng
-    const { aesGroupKey, keyID: derivedID } =
-      deriveGroupKey(origVersion, deviceType);
-    if (derivedID.toLowerCase() !== keyID.toLowerCase()) {
-      throw new Error("keyID mismatch even after recovering version");
-    }
+    const mfBuf       = await downloadFile(`${cid}/manifest.json`);
+    const {version, cidWrap, cidCipher } = JSON.parse(mfBuf.toString());
     
+    // 1️⃣ derive group‐key & verify keyID
+    const { aesGroupKey, keyID: derivedID } = deriveGroupKey(version, deviceType);
+    if (derivedID !== keyID) throw new Error("keyID mismatch");
+
     // 2️⃣ ensure on‐chain & not revoked
     const info = await KeyRegistry.methods.keys(keyID).call();
     if (info.created === "0") {
@@ -125,8 +101,6 @@ async function processNewFirmware(evt) {
     }
 
     // 3️⃣ fetch manifest + cipher blobs
-    const mfBuf       = await downloadFile(`${cid}/manifest.json`);
-    const { cidWrap, cidCipher } = JSON.parse(mfBuf.toString());
     const wrapBuf     = await downloadFile(cidWrap);
     const cipherBuf   = await downloadFile(cidCipher);
 
