@@ -5,7 +5,7 @@ dotenv.config();
 
 import Web3 from "web3";
 import { createRequire } from "module";
-import mqttClient from "../mqtt/client.js";
+import { mqttClient } from "./mqtt/client.js";
 
 import {
   web3,
