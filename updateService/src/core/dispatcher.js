@@ -25,7 +25,7 @@ import {
   aesGcmDecrypt,
   verifySig,
   sha256
-} from "../services/crypto.service.js";
+} from "../services/crypto.js";
 
 // load DeviceConfiguration.json
 const require = createRequire(import.meta.url);
