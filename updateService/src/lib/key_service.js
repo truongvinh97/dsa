@@ -63,5 +63,5 @@ export function deriveGroupKey(version, deviceType) {
  *    để dispatcher dùng unwrap session key.
  */
 export function deriveWrapPrivKey() {
-  return WRAP_PRIV_HEX;
+  return Buffer.from(WRAP_PRIV_HEX.replace(/^0x/, ""), "hex");
 }
