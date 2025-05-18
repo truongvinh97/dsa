@@ -25,20 +25,19 @@ export function sha256(data) {
  * @param {string} privHex  0x-prefixed hex private key (32 bytes)
  * @returns {string}        0x-prefixed 65-byte signature (r|s|recovery)
  */
-export function eciesDecrypt(privHex, encrypted) {
-  try {
-    const privStr = Buffer.isBuffer(privHex)
-      ? privHex.toString("hex")
-      : String(privHex).replace(/^0x/, "");
-
-    const priv = Buffer.from(privStr, "hex");
-
-    return ecies.decrypt(priv, encrypted);
-  } catch (err) {
-    console.error("[Crypto] ❌ ECIES decrypt failed:", err.message);
-    throw err;
-  }
+export function signHash(hashBuf, privHex) {
+  // noble-secp256k1 wants hex or Uint8Array
+  const priv = privHex.replace(/^0x/, "");
+  // recovered=true to get [signatureRS, recovery]
+  const [sigBytes, recId] = secp.signSync(hashBuf, priv, {
+    recovered: true,
+    canonical: true
+  });
+  const sigHex = secp.utils.bytesToHex(sigBytes);
+  const vHex   = recId.toString(16).padStart(2, "0");
+  return "0x" + sigHex + vHex;
 }
+
 /**
  * ECDSA verify
  * @param {Buffer} hashBuf
