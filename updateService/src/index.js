@@ -1,50 +1,74 @@
+#!/usr/bin/env node
 // src/index.js
-// ------------------------------------------------------------------
-// Entry-point cho hệ thống update-service trên Raspberry Pi
-// ------------------------------------------------------------------
+// Entry‐point for Update Service on Raspberry Pi
 
 import dotenv from "dotenv";
-dotenv.config(); // Load .env trước tiên
+dotenv.config(); // load .env first
 
-import { connectMQTT } from "./mqtt/client.js";
+import { connectMQTT, mqttClient } from "./mqtt/client.js";
 import startDispatcher from "./core/dispatcher.js";
-import { initWeb3 } from "./web3/index.js";
+import { initWeb3, web3 } from "./web3/index.js";
 
-/**
- * Hàm khởi động hệ thống chính
- */
 async function main() {
   try {
-    console.log("🚀 [UpdateService] Starting update-service...");
+    console.log("🚀 [UpdateService] Starting update‐service...");
 
-    // 1. Kết nối đến MQTT broker
+    // 1️⃣ Connect to MQTT broker
     console.log("[UpdateService] Connecting to MQTT broker...");
     await connectMQTT();
-    console.log("[UpdateService] MQTT connected successfully.");
+    console.log("[UpdateService] MQTT connected.");
 
-    // 2. Khởi động Dispatcher để lắng nghe sự kiện NewFirmware
+    // 2️⃣ Initialize Web3 & load contracts
+    console.log("[UpdateService] Initializing Web3...");
     await initWeb3();
-    await startDispatcher();
+    console.log("[UpdateService] Web3 initialized.");
+
+    // 3️⃣ Start dispatcher loop & MQTT listeners
+    console.log("[UpdateService] Starting dispatcher...");
+    startDispatcher();
 
     console.log("✅ [UpdateService] Service is up and running.");
   } catch (err) {
     console.error("🔥 [UpdateService] Startup error:", err);
-    process.exit(1); // Thoát nếu lỗi khởi động
+    process.exit(1);
   }
 }
 
-// ------------------------------------------------------------------
-// Catch toàn bộ lỗi chưa bắt được để không crash bất ngờ
-// ------------------------------------------------------------------
+// catch unhandled promise rejections
 process.on("unhandledRejection", (reason, promise) => {
   console.error("🛑 Unhandled Rejection at:", promise, "reason:", reason);
 });
+
+// catch uncaught exceptions
 process.on("uncaughtException", (err) => {
   console.error("🛑 Uncaught Exception:", err);
   process.exit(1);
 });
 
-// ------------------------------------------------------------------
-// Start
-// ------------------------------------------------------------------
+// graceful shutdown on SIGINT/SIGTERM
+process.on("SIGINT", () => {
+  console.log("🛑 [UpdateService] Received SIGINT, shutting down...");
+  mqttClient.end(true, () => {
+    console.log("[UpdateService] MQTT client disconnected.");
+    if (web3.currentProvider?.disconnect) {
+      web3.currentProvider.disconnect();
+      console.log("[UpdateService] Web3 provider disconnected.");
+    }
+    process.exit(0);
+  });
+});
+
+process.on("SIGTERM", () => {
+  console.log("🛑 [UpdateService] Received SIGTERM, shutting down...");
+  mqttClient.end(true, () => {
+    console.log("[UpdateService] MQTT client disconnected.");
+    if (web3.currentProvider?.disconnect) {
+      web3.currentProvider.disconnect();
+      console.log("[UpdateService] Web3 provider disconnected.");
+    }
+    process.exit(0);
+  });
+});
+
+// start the service
 main();

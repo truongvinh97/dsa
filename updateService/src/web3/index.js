@@ -1,45 +1,62 @@
+// src/web3/index.js
 import Web3 from "web3";
 import fs from "fs/promises";
-import dotenv from "dotenv"; dotenv.config();
+import path from "path";
+import dotenv from "dotenv";
+dotenv.config();
 
-//const RPC_URL = "http://192.168.1.24:7545";
-//const web3 = new Web3(RPC_URL);
+// 1. Create web3 from RPC_URL (ws://… or http://…)
+if (!process.env.RPC_URL) {
+  throw new Error("Missing RPC_URL in .env");
+}
+const provider = process.env.RPC_URL.startsWith("ws")
+  ? new Web3.providers.WebsocketProvider(process.env.RPC_URL)
+  : new Web3.providers.HttpProvider(process.env.RPC_URL);
+export const web3 = new Web3(provider);
 
-const RPC_URL = process.env.RPC_URL || "ws://192.168.1.24:7545";
-const web3    = RPC_URL.startsWith("ws")
-  ? new Web3(new Web3.providers.WebsocketProvider(RPC_URL))
-  : new Web3(new Web3.providers.HttpProvider(RPC_URL));
-
-let Firmware, Device;
-
+// 2. Helpers to load ABI + find address
 async function loadABI(name) {
   const filePath = new URL(`./abi/${name}.json`, import.meta.url);
   const json = await fs.readFile(filePath, "utf8");
   return JSON.parse(json);
 }
 
-async function contract(name, envAddr) {
+async function getContract(name, envVar) {
   const artifact = await loadABI(name);
-  const addr = Object.values(artifact.networks)[0]?.address;
-  console.log("[WEB3] Address:", addr);
-  if (!addr) throw new Error(`Missing contract address for ${name}`);
-  return new web3.eth.Contract(artifact.abi, addr);
+  // first try ENV override
+  let address = process.env[envVar];
+  // fallback to first network in artifact.networks
+  if (!address && artifact.networks) {
+    const nets = Object.keys(artifact.networks);
+    if (nets.length > 0) {
+      address = artifact.networks[nets[0]].address;
+    }
+  }
+  if (!address) {
+    throw new Error(`No address for ${name}, set ${envVar} or populate artifact.networks`);
+  }
+  return new web3.eth.Contract(artifact.abi, address);
 }
 
-let _default;
+// 3. Exported contract instances (populated in initWeb3)
+export let Firmware;
+export let Device;
+export let KeyRegistry;
+let _defaultAccount;
 
+/**
+ * Call once at startup to wire up web3 + contracts.
+ */
 export async function initWeb3() {
-  Firmware = await contract("FirmwareRegistry", "FIRMWARE_ADDRESS");
-  Device   = await contract("DeviceRegistry", "DEVICE_ADDRESS");
-  _default = (await web3.eth.getAccounts())[0];
+  // pick first account as default sender
+  const accounts = await web3.eth.getAccounts();
+  if (accounts.length === 0) throw new Error("No accounts available from RPC");
+  _defaultAccount = accounts[0];
+
+  // load all three registries
+  Firmware    = await getContract("FirmwareRegistry",   "FIRMWARE_REGISTRY_ADDRESS");
+  Device      = await getContract("DeviceRegistry",     "DEVICE_REGISTRY_ADDRESS");
+  KeyRegistry = await getContract("KeyRegistry",        "KEY_REGISTRY_ADDRESS");
+
+  console.log("[web3] using default account", _defaultAccount);
 }
-
-export { Firmware, Device };
-
-export const defaultAccount = async () => _default;
-
-export const sendTx = async (method, opts = {}) => {
-  const from = opts.from || (await defaultAccount());
-  const gas  = opts.gas  || (await method.estimateGas({ from })) + 25_000;
-  return method.send({ from, gas, ...opts });
-};

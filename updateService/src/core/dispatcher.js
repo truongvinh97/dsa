@@ -1,156 +1,162 @@
 // src/core/dispatcher.js
-// -----------------------------------------------------------------------------
-// Dispatcher (Polling Version) - For HTTP-only RPC (e.g., Ganache GUI)
-// Periodically queries the blockchain for new firmware release events.
-// -----------------------------------------------------------------------------
 
-import { Firmware, Device } from "../web3/index.js";
-import { downloadFile } from "../lib/ipfs.js";
-import { decryptForDevice } from "./decrypt.js";
-import { publishUpdate } from "../mqtt/client.js";
 import dotenv from "dotenv";
-import Web3 from "web3";
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-// Đảm bảo tên file và đường dẫn match – đây là “DeviceConfiguration.json”
-const devicesConfig = require("./DeviceConfiguration.json");
-
 dotenv.config();
 
-// Create a Web3 instance for RPC connection
-const RPC_URL = process.env.RPC_URL || "ws://192.168.1.24:7545";
-const DEVICE_KEY_DIR = process.env.DEVICE_KEY_DIR || "/etc/ota/keys";
-const web3 = new Web3(RPC_URL);
+import Web3 from "web3";
+import { createRequire } from "module";
+import mqttClient from "../mqtt/client.js";
+import { sendTx } from "../services/web3.service.js";
 
-// Initialize block tracking
+import {
+  web3,
+  Firmware,
+  Device,
+  KeyRegistry
+} from "../web3/index.js";
+
+import { downloadFile } from "../lib/ipfs.js";
+import {
+  deriveGroupKey,
+  deriveWrapPrivKey
+} from "../lib/key_service.js";
+import {
+  eciesDecrypt,
+  aesGcmDecrypt,
+  verifySig,
+  sha256
+} from "../services/crypto.service.js";
+
+// load DeviceConfiguration.json
+const require = createRequire(import.meta.url);
+const deviceConfigs = require("../config/DeviceConfiguration.json");
+
+// gateway must hold GATEWAY_ROLE on DeviceRegistry
+const GATEWAY_ADDR = process.env.GATEWAY_ADDRESS;
+if (!GATEWAY_ADDR) throw new Error("Missing GATEWAY_ADDRESS in .env");
+
+// initialize block cursor
 let lastBlock = await web3.eth.getBlockNumber();
+console.log(`[Dispatcher] starting from block #${lastBlock}`);
 
-/**
- * Start the dispatcher service:
- * Periodically polls for NewFirmware events every 2 seconds,
- * validates the firmware, and dispatches updates to target devices.
- */
-export default async function startDispatcher() {
-  console.log("[Dispatcher] Polling NewFirmware events...");
+// ── A) Polling NewFirmware ────────────────────────────────────────
+async function pollNewFirmware() {
+  const current = await web3.eth.getBlockNumber();
+  if (current <= lastBlock) return;
 
-  setInterval(async () => {
+  const events = await Firmware.getPastEvents("NewFirmware", {
+    fromBlock: lastBlock + 1n,
+    toBlock:   current
+  });
+
+  for (const evt of events) {
+    const { version, cid, keyID, hash, signature, deviceType } =
+      evt.returnValues;
+
+    console.log(`\n[Dispatcher] 🔔 NewFirmware v=${version} type=${deviceType} CID=${cid}`);
+
     try {
-      // (1) Get the latest block number
-      const currentBlock = await web3.eth.getBlockNumber();
-      const devicesconfig = devicesConfig;
+      // 1️⃣ derive group‐key & verify keyID
+      const { aesGroupKey, keyID: derivedID } = deriveGroupKey(version, deviceType);
+      if (derivedID !== keyID) throw new Error("keyID mismatch");
 
-      // (2) Query all NewFirmware events from lastBlock + 1 to currentBlock
-      const events = await Firmware.getPastEvents("NewFirmware", {
-        fromBlock: lastBlock + 1n,
-        toBlock: currentBlock
+      // 2️⃣ ensure on‐chain & not revoked
+      const info = await KeyRegistry.methods.keys(keyID).call();
+      if (info.created === "0") {
+        console.log("[Dispatcher] ➕ Adding group key on-chain");
+        await sendTx(
+          KeyRegistry.methods.addKey(keyID, sha256(aesGroupKey)),
+          { from: GATEWAY_ADDR }
+        );
+        console.log("    ✅ key registered");
+      }
+      if (info.revoked) {
+        console.warn(`[Dispatcher] ⚠ keyID ${keyID} revoked → skip v=${version}`);
+        continue;
+      }
+
+      // 3️⃣ fetch manifest + cipher
+      const mfBuf       = await downloadFile(`${cid}/manifest.json`);
+      const { cidWrap, cidCipher } = JSON.parse(mfBuf.toString());
+      const wrapBuf     = await downloadFile(cidWrap);
+      const cipherBuf   = await downloadFile(cidCipher);
+
+      // 4️⃣ unwrap session‐key
+      const privWrapKey = deriveWrapPrivKey(version, deviceType);
+      const sessKey     = eciesDecrypt(privWrapKey, wrapBuf);
+
+      // 5️⃣ decrypt firmware
+      const firmware = aesGcmDecrypt(cipherBuf, sessKey);
+
+      // 6️⃣ verify hash & signature
+      const localHashHex = "0x" + sha256(firmware).toString("hex");
+      if (localHashHex !== hash) throw new Error("hash mismatch");
+      if (!verifySig(Buffer.from(hash.slice(2), "hex"), signature, process.env.MFG_PUB_KEY)) {
+        throw new Error("invalid signature");
+      }
+
+      // 7️⃣ filter on-chain devices by config.autoUpdate + type
+      const allDevices = await Device.methods.getAllDevices().call();
+      const targets = allDevices.filter(d => {
+        const cfg = deviceConfigs[d.deviceId];
+        return cfg && cfg.autoUpdate && cfg.deviceType === deviceType;
       });
 
-      // (3) Process each new firmware event
-      for (const event of events) {
-        const meta = event.returnValues;
-        console.log(`[Dispatcher] 📦 NewFirmware detected: version=${meta.version}, CID=${meta.cid}`);
-
-        try {
-          // (4) Query full metadata (keyID, signature, hash, deviceType) from the smart contract
-          // const fwMeta = await Firmware.methods.getFirmware(meta.version).call();
-          // const fullMeta = { ...fwMeta, version: meta.version };
-
-          // (5) Download the encrypted firmware package from IPFS
-          const cipherPkg = await downloadFile(meta.cid);
-
-          // (6) Get all registered devices
-          const devices = await Device.methods.getAllDevices().call();
-
-          // (7) Filter devices matching the required deviceType
-          const targets = devices
-            .filter(d => d.deviceId === meta.deviceType)//&& devicesconfig.autoUpdate === true
-            .map(d => ({
-              deviceId: d.deviceId,
-              pubKey: devicesconfig.pubKey,
-              privPath: devicesconfig.privPath,//`${DEVICE_KEY_DIR}/${d.deviceId}.priv`,
-            }));
-
-          if (targets.length === 0) {
-            console.warn(`[Dispatcher] ⚠️ No devices found for deviceType=${meta.deviceType}`);
-            continue;
-          }
-
-          /*
-          // (8) Attempt to decrypt and publish the update to each device
-          let success = 0;
-          for (const dev of targets) {
-            try {
-              await decryptForDevice(meta, cipherPkg, devicesconfig);
-
-              // Publish an OTA_START command via MQTT
-              publishUpdate(dev.deviceId, {
-                command: "OTA_START",
-                version: meta.version,
-                keyID: meta.keyID,
-                CID: meta.cid,
-              });
-
-              success++;
-            } catch (err) {
-              console.warn(`[Dispatcher] ❌ Failed to decrypt or dispatch for ${dev.deviceId}:`, err.message);
-            }
-          }
-
-          // (9) Log the dispatch result
-          console.log(`[Dispatcher] ✅ Firmware ${meta.version} dispatched to ${success}/${targets.length} devices.`);
-          */
-
-          // (8) Attempt to decrypt and publish the update to each device (dummy)
-let success = 0;
-for (const dev of targets) {
-  try {
-    console.log(`[Decrypt] OK: firmware version ${meta.version}, size=6144 bytes`);
-
-    // Publish an OTA_START command via MQTT
-    await publishUpdate(dev.deviceId, {
-      command: "OTA_START",
-      version: meta.version,
-      keyID:   meta.keyID,
-      CID:     meta.cid,
-    });
-    console.log(`[Dispatcher] ✅ OTA_START sent to ${dev.deviceId}`);
-
-    // --- Dummy bước 8: chờ 4s rồi report lên chain ---
-    console.log(`[Dispatcher] ⏳ Waiting to simulate OTA for ${dev.deviceId}...`);
-    await new Promise(res => setTimeout(res, 4000));
-
-    // build transaction call
-const tx = Device.methods.updateDeviceStatus(dev.deviceId, meta.version);
-
-// estimate gas
-const gatewayAddr = "0x2bb01dcE078bd56565ef51C45b34A05Ae869Ab2c";
-const gas = await tx.estimateGas({ from: gatewayAddr });
-console.log(`[Dispatcher] ℹ️ Estimated gas: ${gas}`);
-
-// send with explicit gas limit
-const receipt = await tx.send({
-  from: gatewayAddr,
-  gas: gas + 10000n  // thêm chút buffer
-});
-    // ----------------------------------------------
-
-    success++;
-  } catch (err) {
-    console.warn(`[Dispatcher] ❌ Failed for ${dev.deviceId}:`, err.message);
-  }
-}
-
-        } catch (err) {
-          console.error("[Dispatcher] ❌ Error processing firmware event:", err.message);
+      if (targets.length === 0) {
+        console.warn(`[Dispatcher] ⚠ no auto-update targets for ${deviceType}`);
+      } else {
+        // 8️⃣ publish OTA_START via MQTT
+        for (const d of targets) {
+          const topic   = `ota/${d.deviceId}`;
+          const payload = {
+            command:   "OTA_START",
+            version,
+            cid,
+            keyID,
+            hash,
+            signature
+          };
+          mqttClient.publish(topic, JSON.stringify(payload));
+          console.log(`[Dispatcher] ➡ MQTT ${topic}`);
         }
       }
 
-      // (10) Update last processed block number
-      lastBlock = currentBlock;
-
     } catch (err) {
-      console.error("[Dispatcher] 🔥 Polling error:", err.message);
+      console.error(`[Dispatcher] ❌ failed v=${version}:`, err.message);
     }
-  }, 2000); // Poll every 2 seconds
+  }
+
+  lastBlock = current;
 }
+
+// start polling every 2s
+setInterval(() => {
+  pollNewFirmware().catch(e => console.error("[Dispatcher] poll error:", e.message));
+}, 2000);
+
+// ── B) Listen for OTA reports ────────────────────────────────────
+mqttClient.subscribe("ota/report/#", err => {
+  if (err) console.error("[Dispatcher] MQTT subscribe error:", err.message);
+});
+
+mqttClient.on("message", async (topic, msg) => {
+  try {
+    // topic = "ota/report/<deviceId>"
+    const [, , deviceId] = topic.split("/");
+    const { version, OK } = JSON.parse(msg.toString());
+    if (!OK) return console.warn(`[Dispatcher] 🚨 OTA failed on ${deviceId}`);
+
+    console.log(`[Dispatcher] 📣 OTA OK from ${deviceId}, v=${version}`);
+
+    // send on-chain status update
+    await sendTx(
+      Device.methods.updateDeviceStatus(deviceId, version),
+      { from: GATEWAY_ADDR }
+    );
+    console.log(`[Dispatcher] ✅ updateDeviceStatus(${deviceId},${version}) sent`);
+
+  } catch (e) {
+    console.error("[Dispatcher] report handler error:", e.message);
+  }
+});
+

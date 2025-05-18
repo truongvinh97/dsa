@@ -1,8 +1,20 @@
-[
-  {
-    "deviceId":   "dev2",
-    "pubKey":  "5a80f1d3fe250fde1d849f1b7af0265de15cef745ad0aa936665c1b70cec3beae4010519d63e3bb586dd27e149f25fd4b37ecbb96685f42f5af75a1180",
-    "privPath":   "./keys/dev2/manufacturer_priv.pem",
-    "autoUpdate": true
+{
+  "DEV-001": {
+    "autoUpdate": true,
+    "deviceType": "sensorBoard",
+    "pubKey": "0x04a1b2c3d4e5f678901234567890abcdef1234567890abcdef1234567890abcdef",
+    "privPath": "/etc/ota/keys/DEV-001.priv"
+  },
+  "Dev2": {
+    "autoUpdate": false,
+    "deviceType": "sensorBoard",
+    "pubKey": "0x04b2c3d4e5f678901234567890abcdef1234567890abcdef1234567890abcdef1234",
+    "privPath": "/etc/ota/keys/DEV-002.priv"
+  },
+  "DEV-003": {
+    "autoUpdate": true,
+    "deviceType": "controller",
+    "pubKey": "0x04c3d4e5f678901234567890abcdef1234567890abcdef1234567890abcdef123456",
+    "privPath": "/etc/ota/keys/DEV-003.priv"
   }
-]
+}

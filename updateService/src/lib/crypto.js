@@ -1,107 +1,110 @@
-/*  server/src/services/crypto.service.js
- *  -------------------------------------
- *  – SHA‑256
- *  – ECDSA secp256k1  (noble‑secp256k1  v2.x, pure JS)
- *  – AES‑256‑GCM
- *  – ECIES  (geth compatible)
- */
+// src/services/crypto.service.js
 
-import crypto         from "crypto";
-import * as secp      from "@noble/secp256k1";
-import { etc, sign, verify, getPublicKey } from '@noble/secp256k1';
+import crypto from "crypto";
+import * as secp from "@noble/secp256k1";
+import ecies from "ecies-geth";
 
-/* small helpers ---------------------------------------------------- */
-const hex  = secp.utils.bytesToHex;
-const bhex = (h) => Buffer.from(h.replace(/^0x/, ""), "hex");
-
-/* ------------------------------------------------------------------ */
-/* 1. SHA‑256                                                         */
-/* ------------------------------------------------------------------ */
-etc.hmacSha256Sync = (key, ...messages) => {
-  const hmac = crypto.createHmac('sha256', key);
-  messages.forEach(msg => hmac.update(msg));
-  return hmac.digest();
+secp.utils.hmacSha256Sync = (key, ...msgs) => {
+  const h = crypto.createHmac("sha256", key);
+  msgs.forEach(m => h.update(m));
+  return h.digest();
 };
 
-export const sha256 = (buf) =>
-  crypto.createHash("sha256").update(buf).digest();      // → Buffer(32)
-
-/* ------------------------------------------------------------------ */
-/* 2. ECDSA  sign / verify                                            */
-/* ------------------------------------------------------------------ */
-
-/* ...... Sign SHA256 Hash ...... */
-export async function signHash(hashBuf, privHex) {
-  const privKey = privHex.replace(/^0x/, '');
-  const signature = await sign(
-    hashBuf.toString('hex'),
-    privKey,
-    { 
-      lowS: true,       // Ngăn chặn malleability
-      extraEntropy: true // Tăng cường bảo mật
-    }
-  );
-
-  const sigBytes = signature.toCompactRawBytes();
-  const recovery = signature.recovery;
-  const sigFull = Buffer.concat([
-    Buffer.from(sigBytes),
-    Buffer.from([recovery])
-  ]);
-
-  return '0x' + sigFull.toString('hex');
-}
-/* ...... Verify Signature ...... */
 /**
- * @param {Buffer} hashBuf - 32-byte digest
- * @param {string} sigHex - Signature (0x-prefixed 65-byte r|s|v)
- * @param {string} pubKeyHex - Uncompressed public key (0x04 + 64 bytes)
- * @returns {Promise<boolean>}
+ * SHA-256
+ * @param {Buffer} data
+ * @returns {Buffer} 32-byte digest
  */
-export async function verifySig(hashBuf, sigHex, pubKeyHex) {
-  const sigBuf = Buffer.from(sigHex.slice(2), 'hex');
-  if (sigBuf.length !== 65) return false;
-  
-  const signature = sigBuf.subarray(0, 64);
-  const msgHash = hashBuf.toString('hex');
-  const publicKey = pubKeyHex.slice(2);
-  
-  try {
-    return await verify(
-      signature.toString('hex'),
-      msgHash,
-      publicKey
-    );
-  } catch {
-    return false;
-  }
+export function sha256(data) {
+  return crypto.createHash("sha256").update(data).digest();
 }
 
-/* ------------------------------------------------------------------ */
-/* 3. AES‑256‑GCM                                                     */
-/* ------------------------------------------------------------------ */
-export function aesGcmEncrypt(plainBuf, keyBuf) {
-  const iv   = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", keyBuf, iv);
-  const enc  = Buffer.concat([cipher.update(plainBuf), cipher.final()]);
-  const tag  = cipher.getAuthTag();
-  return { cipher: enc, iv, tag };
+/**
+ * ECDSA sign (secp256k1) of a 32-byte hash
+ * @param {Buffer} hashBuf
+ * @param {string} privHex  0x-prefixed hex private key (32 bytes)
+ * @returns {string}        0x-prefixed 65-byte signature (r|s|recovery)
+ */
+export function signHash(hashBuf, privHex) {
+  // noble-secp256k1 wants hex or Uint8Array
+  const priv = privHex.replace(/^0x/, "");
+  // recovered=true to get [signatureRS, recovery]
+  const [sigBytes, recId] = secp.signSync(hashBuf, priv, {
+    recovered: true,
+    canonical: true
+  });
+  const sigHex = secp.utils.bytesToHex(sigBytes);
+  const vHex   = recId.toString(16).padStart(2, "0");
+  return "0x" + sigHex + vHex;
 }
 
-export function aesGcmDecrypt(cipherBuf, keyBuf, iv, tag) {
-  const decipher = crypto.createDecipheriv("aes-256-gcm", keyBuf, iv);
+/**
+ * ECDSA verify
+ * @param {Buffer} hashBuf
+ * @param {string} sigHex    0x-prefixed 65-byte signature
+ * @param {string} pubHex    0x04-prefixed uncompressed public key
+ * @returns {boolean}
+ */
+export function verifySig(hashBuf, sigHex, pubHex) {
+  const sig = Buffer.from(sigHex.replace(/^0x/, ""), "hex");
+  if (sig.length !== 65) return false;
+  // slice off recovery byte
+  const rs = sig.slice(0, 64);
+  // noble verify accepts hex or Uint8Array
+  return secp.verify(
+    secp.utils.bytesToHex(rs),
+    hashBuf,
+    pubHex.replace(/^0x/, "")
+  );
+}
+
+/**
+ * AES-256-GCM encrypt
+ * @param {Buffer} plaintext
+ * @param {Buffer} key        32-byte key
+ * @returns {Buffer}          iv(12) || ciphertext || authTag(16)
+ */
+export function aesGcmEncrypt(plaintext, key) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const ct = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, ct, tag]);
+}
+
+/**
+ * AES-256-GCM decrypt
+ * @param {Buffer} encrypted   iv(12) || ciphertext || tag(16)
+ * @param {Buffer} key         32-byte key
+ * @returns {Buffer}           plaintext
+ */
+export function aesGcmDecrypt(encrypted, key) {
+  const iv = encrypted.slice(0, 12);
+  const tag = encrypted.slice(encrypted.length - 16);
+  const ct = encrypted.slice(12, encrypted.length - 16);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(cipherBuf), decipher.final()]);
+  return Buffer.concat([decipher.update(ct), decipher.final()]);
 }
 
-/* ------------------------------------------------------------------ */
-/* 4. ECIES helper (using ecies-geth)                                 */
-/* ------------------------------------------------------------------ */
-export function eciesEncrypt(pubKeyHex, plainBuf) {
-  return ecies.encrypt(Buffer.from(pubKeyHex.slice(2), "hex"), plainBuf);
+/**
+ * ECIES encrypt (for wrapping session-key)
+ * @param {string} pubHex     0x-prefixed uncompressed EC public key
+ * @param {Buffer} data       plaintext
+ * @returns {Buffer}          ciphertext
+ */
+export function eciesEncrypt(pubHex, data) {
+  const pub = Buffer.from(pubHex.replace(/^0x/, ""), "hex");
+  return ecies.encrypt(pub, data);
 }
 
-export function eciesDecrypt(privKeyHex, cipherBuf) {
-  return ecies.decrypt(Buffer.from(privKeyHex.slice(2), "hex"), cipherBuf);
+/**
+ * ECIES decrypt (for unwrapping session-key)
+ * @param {string} privHex    0x-prefixed EC private key
+ * @param {Buffer} encrypted
+ * @returns {Buffer}           plaintext
+ */
+export function eciesDecrypt(privHex, encrypted) {
+  const priv = Buffer.from(privHex.replace(/^0x/, ""), "hex");
+  return ecies.decrypt(priv, encrypted);
 }
-

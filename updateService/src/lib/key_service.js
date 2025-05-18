@@ -1,37 +1,62 @@
-/*  src/lib/key-service.js
- *  -----------------------
- *  REST client wrapper for Key Distribution Service (backend)
- *  Used by Raspberry Pi Gateway to fetch per-device wrapped AES keys
+// src/lib/key_service.js
+
+import crypto from "crypto";
+import dotenv from "dotenv";
+dotenv.config();
+
+import { HDNodeWallet } from "ethers/wallet";
+import { keccak256, toUtf8Bytes } from "ethers/utils";
+
+// ── 1. Đọc biến môi trường ───────────────────────────────────────────
+const { MASTER_SECRET, LOCAL_XPUB, LOCAL_XPRV } = process.env;
+
+if (!MASTER_SECRET) throw new Error("[KeyService] Missing MASTER_SECRET");
+if (!LOCAL_XPUB)   throw new Error("[KeyService] Missing LOCAL_XPUB");
+if (!LOCAL_XPRV)   throw new Error("[KeyService] Missing LOCAL_XPRV");
+
+const masterSecretBuf = Buffer.from(MASTER_SECRET.replace(/^0x/, ""), "hex");
+
+/**
+ * Tính index từ `${version}|${deviceType}`
  */
-
-import axios from "axios";
-
-const baseURL = process.env.KEY_SERVICE || "http://192.168.1.24:4000/api/v1/keys";
-
-if (!baseURL) {
-  throw new Error("[KeyService] Missing KEY_SERVICE env variable");
+function computeDerivationIndex(version, deviceType) {
+  const id = `${version}|${deviceType}`;
+  const hash = keccak256(toUtf8Bytes(id));  // returns "0x…"
+  return parseInt(hash.slice(-8), 16) & 0x7fffffff;
 }
 
 /**
- * Request a wrapped (encrypted) AES key from KeyService
- * @param {string} keyID      – 32-byte key identifier (hex string)
- * @param {string} pubHex     – 65-byte EC public key (0x04 + X + Y)
- * @returns {Promise<Buffer>} – Encrypted AES key (wrapped using ECIES)
+ * deriveGroupKey(version, deviceType)
+ * → { keyID, aesGroupKey, pubWrapKey }
  */
-export async function getWrappedKey(keyID, pubHex) {
-  try {
-    const response = await axios.get(`${baseURL}/${keyID}`, {
-      params: { pub: pubHex }
-    });
+export function deriveGroupKey(version, deviceType) {
+  const id = `${version}|${deviceType}`;
 
-    if (!response.data?.cipherHex) {
-      throw new Error("Invalid response from KeyService");
-    }
+  // 1) Tạo AES-group-key
+  const aesGroupKey = crypto
+    .createHmac("sha256", masterSecretBuf)
+    .update(id)
+    .digest();  // Buffer
 
-    return Buffer.from(response.data.cipherHex.replace(/^0x/, ""), "hex");
+  // 2) Tạo keyID = keccak256(aesGroupKey)
+  const keyID = keccak256(aesGroupKey);  // → "0x…" hex
 
-  } catch (err) {
-    console.error("[KeyService] Failed to fetch key:", err.message);
-    throw new Error("Failed to retrieve wrapped key from KeyService");
-  }
+  // 3) Lấy pubWrapKey từ XPUB
+  const index = computeDerivationIndex(version, deviceType);
+  const root  = HDNodeWallet.fromExtendedKey(LOCAL_XPUB);
+  const node  = root.derivePath(`m/0/${index}`);
+  const pubWrapKey = node.publicKey;  // 0x04 + 64 bytes
+
+  return { keyID, aesGroupKey, pubWrapKey };
+}
+
+/**
+ * deriveWrapPrivKey(version, deviceType)
+ * → private EC key for ECIES decryption
+ */
+export function deriveWrapPrivKey(version, deviceType) {
+  const index = computeDerivationIndex(version, deviceType);
+  const root  = HDNodeWallet.fromExtendedKey(LOCAL_XPRV);
+  const node  = root.derivePath(`m/0/${index}`);
+  return node.privateKey; // "0x…" hex
 }
