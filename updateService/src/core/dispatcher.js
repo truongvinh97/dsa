@@ -72,17 +72,17 @@ export default async function startDispatcher() {
  * - publish MQTT OTA_START
  */
 async function processNewFirmware({
-  cid, keyID, hash, signature, deviceType
+  version, cid, keyID, hash, signature, deviceType
 }) {
   console.log(`\n[Dispatcher] 🔔 NewFirmware v=${version} type=${deviceType} CID=${cid}`);
 
   try {
 
     const mfBuf       = await downloadFile(`${cid}/manifest.json`);
-    const {version, cidWrap, cidCipher } = JSON.parse(mfBuf.toString());
+    const {version: manifestVersion, cidWrap, cidCipher } = JSON.parse(mfBuf.toString());
     
     // 1️⃣ derive group‐key & verify keyID
-    const { aesGroupKey, keyID: derivedID } = deriveGroupKey(version, deviceType);
+    const { aesGroupKey, keyID: derivedID } = deriveGroupKey(manifestVersion, deviceType);
     if (derivedID !== keyID) throw new Error("keyID mismatch");
 
     // 2️⃣ ensure on‐chain & not revoked
@@ -105,7 +105,7 @@ async function processNewFirmware({
     const cipherBuf   = await downloadFile(cidCipher);
 
     // 4️⃣ unwrap session‐key
-    const privWrapKey = deriveWrapPrivKey(version, deviceType);
+    const privWrapKey = deriveWrapPrivKey(manifestVersion, deviceType);
     const sessKey     = eciesDecrypt(privWrapKey, wrapBuf);
 
     // 5️⃣ decrypt firmware
@@ -133,7 +133,7 @@ async function processNewFirmware({
     // 8️⃣ publish OTA_START to each
     for (const d of targets) {
       const topic   = `ota/${d.deviceId}`;
-      const payload = { command:"OTA_START", version, cid, keyID, hash, signature };
+      const payload = { command:"OTA_START", manifestVersion, cid, keyID, hash, signature };
       await mqttClient.publishUpdate(d.deviceId, payload);
       console.log(`[Dispatcher] ➡ OTA_START → ${d.deviceId}`);
     }
