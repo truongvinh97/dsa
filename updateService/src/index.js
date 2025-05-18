@@ -5,7 +5,7 @@
 import dotenv from "dotenv";
 dotenv.config(); // load .env first
 
-import { connectMQTT, mqttClient } from "./mqtt/client.js";
+import mqttClient from "./mqtt/client.js";
 import startDispatcher from "./core/dispatcher.js";
 import { initWeb3, web3 } from "./web3/index.js";
 
@@ -15,7 +15,7 @@ async function main() {
 
     // 1️⃣ Connect to MQTT broker
     console.log("[UpdateService] Connecting to MQTT broker...");
-    await connectMQTT();
+    await mqttClient.connectMQTT();
     console.log("[UpdateService] MQTT connected.");
 
     // 2️⃣ Initialize Web3 & load contracts
