@@ -46,17 +46,26 @@ export function signHash(hashBuf, privHex) {
  * @returns {boolean}
  */
 export function verifySig(hashBuf, sigHex, pubHex) {
-  const sig = Buffer.from(sigHex.replace(/^0x/, ""), "hex");
-  if (sig.length !== 65) return false;
-  // slice off recovery byte
-  const rs = sig.slice(0, 64);
-  // noble verify accepts hex or Uint8Array
-  return secp.verify(
-    secp.utils.bytesToHex(rs),
-    hashBuf,
-    pubHex.replace(/^0x/, "")
-  );
+  // 1) Chuẩn hoá inputs
+  const sigBuf = Buffer.from(sigHex.replace(/^0x/, ""), "hex");
+  if (sigBuf.length !== 65) return false;
+  const rs = sigBuf.slice(0, 64);
+  const rsHex = secp.utils.bytesToHex(rs);
+  const msgHex = hashBuf.toString("hex");
+  const pubKey = pubHex.replace(/^0x/, "");
+
+  // 2) Log chi tiết để debug
+  console.log("🔐 [verifySig] sigHex      =", sigHex);
+  console.log("🔐 [verifySig] r|s (hex)   =", rsHex);
+  console.log("🔐 [verifySig] msgHash (hex)=", msgHex);
+  console.log("🔐 [verifySig] pubKey      =", pubKey.slice(0,20) + "...");
+
+  // 3) Gọi verify
+  const ok = secp.verify(rsHex, msgHex, pubKey);
+  console.log("🔐 [verifySig] result      =", ok);
+  return ok;
 }
+
 
 /**
  * AES-256-GCM encrypt
