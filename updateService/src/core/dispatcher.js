@@ -106,7 +106,7 @@ async function processNewFirmware({
 
     // 4️⃣ unwrap session‐key
     const privWrapKey = deriveWrapPrivKey(manifestVersion, deviceType);
-    const sessKey     = eciesDecrypt(privWrapKey, wrapBuf);
+    const sessKey     = await eciesDecrypt(privWrapKey, wrapBuf);
 
     // 5️⃣ decrypt firmware
     const firmware = aesGcmDecrypt(cipherBuf, sessKey);
