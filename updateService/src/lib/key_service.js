@@ -70,9 +70,13 @@ export function deriveGroupKey(version, deviceType) {
  *  • Trả về private-wrap key (ECIES) cố định từ env
  *    để dispatcher dùng unwrap session key.
  */
-export function deriveWrapPrivKey() {
-  return Buffer.from(
-    String(WRAP_PRIV_HEX).replace(/^0x/, ""),
-    "hex"
-  );
+export function deriveWrapPrivKey(/*version, deviceType*/) {
+  const privHex = WRAP_PRIV_HEX;
+  console.log("▶ [KeyService] deriveWrapPrivKey() env WRAP_PRIV_HEX =", privHex);
+
+  const privBuf = Buffer.from(privHex.replace(/^0x/, ""), "hex");
+  console.log("▶ [KeyService] deriveWrapPrivKey() privBuf.length =", privBuf.length);
+  console.log("▶ [KeyService] deriveWrapPrivKey() privBuf.preview =", privBuf.toString("hex").slice(0, 64), "...");
+
+  return privBuf;
 }

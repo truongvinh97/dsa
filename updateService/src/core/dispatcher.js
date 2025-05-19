@@ -105,8 +105,18 @@ async function processNewFirmware({
     const cipherBuf   = await downloadFile(cidCipher);
 
     // 4️⃣ unwrap session‐key
+    console.log("▶ [Dispatcher] wrapBuf.constructor =", wrapBuf.constructor.name);
+    console.log("▶ [Dispatcher] wrapBuf.isBuffer() =", Buffer.isBuffer(wrapBuf));
+    console.log("▶ [Dispatcher] wrapBuf.length =", wrapBuf.length);
+    console.log("▶ [Dispatcher] wrapBuf.preview =", wrapBuf.toString("hex").slice(0, 100), "...");
     const privWrapKey = deriveWrapPrivKey(manifestVersion, deviceType);
+
+    console.log("▶ [Dispatcher] privWrapKey (Buffer) length =", privWrapKey.length);
+    console.log("▶ [Dispatcher] privWrapKey.preview =", privWrapKey.toString("hex").slice(0, 64), "...");
     const sessKey     = await eciesDecrypt(privWrapKey, wrapBuf);
+
+    console.log("▶ [Dispatcher] sessKey length =", sessKey.length);
+    console.log("▶ [Dispatcher] sessKey.preview =", sessKey.toString("hex").slice(0, 64), "...");
 
     // 5️⃣ decrypt firmware
     const firmware = aesGcmDecrypt(cipherBuf, sessKey);
