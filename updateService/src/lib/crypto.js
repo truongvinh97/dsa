@@ -78,24 +78,26 @@ export function aesGcmEncrypt(plaintext, key) {
  * @param {Buffer} key         32-byte key
  * @returns {Buffer}           plaintext
  */
-export function aesGcmDecrypt(encrypted, key) {
-  // 1) Tách iv/tag/ct
-  const iv  = encrypted.slice(0, 12);
-  const tag = encrypted.slice(encrypted.length - 16);
-  const ct  = encrypted.slice(12, encrypted.length - 16);
+  export function aesGcmDecrypt(packet, key) {
+    // iv: bytes 0–11
+    const iv = packet.slice(0, 12);
+    // tag: bytes 12–27
+    const tag = packet.slice(12, 12 + 16);
+    // cipher: từ offset 28 tới hết
+    const ct = packet.slice(12 + 16);
 
-  console.log("🛠 [AES-GCM] iv =", iv.toString("hex"));
-  console.log("🛠 [AES-GCM] tag =", tag.toString("hex"));
-  console.log("🛠 [AES-GCM] ciphertext.preview =", ct.toString("hex").slice(0,100), "...");
+    console.log("🛠 [AES-GCM] iv      =", iv.toString("hex"));
+    console.log("🛠 [AES-GCM] tag     =", tag.toString("hex"));
+    console.log("🛠 [AES-GCM] ct.preview =", ct.toString("hex").slice(0,100), "...");
 
-  // 2) Giải mã
-  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-  decipher.setAuthTag(tag);
-  const pt = Buffer.concat([decipher.update(ct), decipher.final()]);
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(tag);
+    const pt = Buffer.concat([decipher.update(ct), decipher.final()]);
 
-  console.log("✅ [AES-GCM] plaintext.preview =", pt.toString("hex").slice(0,100), "...");
-  return pt;
-}
+    console.log("✅ [AES-GCM] pt.preview =", pt.toString("hex").slice(0,100), "...");
+    return pt;
+  }
+
 
 /**
  * ECIES encrypt (for wrapping session-key)
