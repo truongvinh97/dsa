@@ -39,30 +39,49 @@ export function signHash(hashBuf, privHex) {
 }
 
 /**
- * ECDSA verify
- * @param {Buffer} hashBuf
- * @param {string} sigHex    0x-prefixed 65-byte signature
- * @param {string} pubHex    0x04-prefixed uncompressed public key
- * @returns {boolean}
+ * ECDSA verify (secp256k1) of a 32-byte hash
+ * @param {Buffer} hashBuf      32-byte SHA-256 digest
+ * @param {string} sigHex       0x-prefixed 65-byte signature (r|s|recovery)
+ * @param {string} pubHex       0x04-prefixed uncompressed public key
+ * @returns {Promise<boolean>}
  */
-export function verifySig(hashBuf, sigHex, pubHex) {
-  // 1) Chuẩn hoá inputs
-  const sigBuf = Buffer.from(sigHex.replace(/^0x/, ""), "hex");
-  if (sigBuf.length !== 65) return false;
-  const rs = sigBuf.slice(0, 64);
+export async function verifySig(hashBuf, sigHex, pubHex) {
+  console.log("🔐 [verifySig] called");
+
+  // 1) Normalize signature
+  console.log("🔐 [verifySig] raw sigHex      =", sigHex);
+  const sigStr = sigHex.replace(/^0x/, "");
+  const sigBuf = Buffer.from(sigStr, "hex");
+  console.log("🔐 [verifySig] sigBuf.length    =", sigBuf.length);
+
+  if (sigBuf.length !== 65) {
+    console.error("🔐 [verifySig] ❌ invalid signature length");
+    return false;
+  }
+
+  // 2) Split r|s and recovery (we only need r|s for verify)
+  const rs    = sigBuf.slice(0, 64);
   const rsHex = secp.utils.bytesToHex(rs);
+  console.log("🔐 [verifySig] r|s (hex)        =", rsHex);
+
+  // 3) Prepare message hash
   const msgHex = hashBuf.toString("hex");
+  console.log("🔐 [verifySig] msgHash (hex)    =", msgHex);
+
+  // 4) Normalize public key
   const pubKey = pubHex.replace(/^0x/, "");
+  console.log("🔐 [verifySig] pubKey           =", pubKey.slice(0, 20) + "...");
 
-  // 2) Log chi tiết để debug
-  console.log("🔐 [verifySig] sigHex      =", sigHex);
-  console.log("🔐 [verifySig] r|s (hex)   =", rsHex);
-  console.log("🔐 [verifySig] msgHash (hex)=", msgHex);
-  console.log("🔐 [verifySig] pubKey      =", pubKey.slice(0,20) + "...");
+  // 5) Run the verify
+  let ok;
+  try {
+    ok = await secp.verify(rsHex, msgHex, pubKey);
+  } catch (err) {
+    console.error("🔐 [verifySig] ❌ secp.verify threw:", err);
+    return false;
+  }
 
-  // 3) Gọi verify
-  const ok = secp.verify(rsHex, msgHex, pubKey);
-  console.log("🔐 [verifySig] result      =", ok);
+  console.log("🔐 [verifySig] result           =", ok);
   return ok;
 }
 

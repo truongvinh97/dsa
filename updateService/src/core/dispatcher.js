@@ -124,11 +124,10 @@ async function processNewFirmware({
     console.log("▶ [Dispatcher] firmware.preview =", firmware.slice(0,100).toString("hex"), "...");
 
     // 6️⃣ verify hash & signature
-    const localHashHex = "0x" + sha256(firmware).toString("hex");
-    if (localHashHex !== hash) throw new Error("hash mismatch");
-    if (!verifySig(Buffer.from(hash.slice(2), "hex"), signature, process.env.MFG_PUB_KEY)) {
-      throw new Error("invalid signature");
-    }
+    const hashBuf   = sha256(firmware);
+    const sigValid  = await verifySig(hashBuf, signature, process.env.MFG_PUB_KEY);
+    console.log("▶ [Dispatcher] signature valid =", sigValid);
+    if (!sigValid) throw new Error("invalid signature");
 
     // 7️⃣ select auto‐update targets
     const allDevices = await Device.methods.getAllDevices().call();
