@@ -109,43 +109,31 @@ export function eciesEncrypt(pubHex, data) {
  * @param {Buffer} encrypted
  * @returns {Buffer}                 plaintext
  */
-export function eciesDecrypt(privHex, encrypted) {
-  console.log("======= [eciesDecrypt] Start =======");
-
-  // Log input type và nội dung
-  console.log("🔑 privHex type =", typeof privHex);
-  console.log("🔑 privHex =", privHex);
-
-  // Xử lý private key
+export async function eciesDecrypt(privHex, encrypted) {
+  console.log("====== [eciesDecrypt] Start =======");
+  // 1) Chuyển privHex về Buffer đúng
   let priv;
-  try {
-    if (Buffer.isBuffer(privHex)) {
-      priv = privHex;
-    } else if (typeof privHex === "string" && /^0x[0-9a-fA-F]{64}$/.test(privHex)) {
-      priv = Buffer.from(privHex.slice(2), "hex");
-    } else {
-      console.error("❌ Invalid privHex format:", privHex);
-      throw new Error("privHex must be 0x-prefixed hex string or Buffer of 32 bytes");
-    }
-  } catch (e) {
-    console.error("❌ Failed to convert privHex to Buffer:", e.message);
-    throw e;
+  if (Buffer.isBuffer(privHex)) {
+    priv = privHex;
+  } else if (typeof privHex === "string" && privHex.startsWith("0x")) {
+    priv = Buffer.from(privHex.slice(2), "hex");
+  } else {
+    throw new Error("privHex không phải 0x-prefixed hex string hoặc Buffer");
   }
+  console.log("✅ priv (hex) =", priv.toString("hex"));
 
-  console.log("✅ Converted priv:", priv.toString("hex"));
+  // 2) Log ciphertext
+  console.log("🧩 encrypted.len =", encrypted.length);
+  console.log("🧩 encrypted.preview =", encrypted.toString("hex").slice(0, 100));
 
-  // Log ciphertext
-  console.log("🧩 Encrypted len =", encrypted.length);
-  console.log("🧩 Encrypted preview =", encrypted.toString("hex").slice(0, 100));
-
-  // Bắt lỗi giải mã ECIES
+  // 3) Thực sự await decrypt, và bắt lỗi MAC ở đây
   try {
-    const decrypted = ecies.decrypt(priv, encrypted);
-    console.log("✅ ECIES decrypt success!");
-    console.log("📝 Decrypted preview:", decrypted.toString("utf8").slice(0, 100));
-    return decrypted;
+    const decrypted = await ecies.decrypt(priv, encrypted);
+    console.log("✅ ECIES decrypt thành công!");
+    console.log("📝 decrypted.preview =", decrypted.toString("hex").slice(0, 100));
+    return decrypted;  // Đây mới là Buffer
   } catch (err) {
-    console.error("❌ ECIES decrypt failed:", err.message);
+    console.error("❌ ECIES decrypt thất bại:", err.message);
     throw err;
   }
 }
