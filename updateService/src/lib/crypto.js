@@ -95,8 +95,13 @@ export function aesGcmDecrypt(encrypted, key) {
  */
 export function eciesEncrypt(pubHex, data) {
   const pub = Buffer.from(pubHex.replace(/^0x/, ""), "hex");
-  return ecies.encrypt(pub, data);
+  console.log("📤 Encrypting with pubKey =", pubHex.slice(0, 20) + "...");
+  console.log("📄 Plaintext preview:", data.toString("utf8").slice(0, 100));
+  const encrypted = ecies.encrypt(pub, data);
+  console.log("✅ Encrypted len =", encrypted.length);
+  return encrypted;
 }
+
 
 /**
  * ECIES decrypt (for unwrapping session-key)
@@ -105,15 +110,44 @@ export function eciesEncrypt(pubHex, data) {
  * @returns {Buffer}                 plaintext
  */
 export function eciesDecrypt(privHex, encrypted) {
-  const privStr = Buffer.isBuffer(privHex)
-    ? privHex.toString("hex")
-    : String(privHex).replace(/^0x/, "");
+  console.log("======= [eciesDecrypt] Start =======");
 
-  const priv = Buffer.from(privStr, "hex");
-  // encrypted là Buffer? Có độ dài hợp lý? Có đúng là cipher từ ECIES?
-  console.log("Encrypted len =", encrypted.length);
-  console.log("Encrypted hex =", encrypted.toString("hex").slice(0, 100));
-  return ecies.decrypt(priv, encrypted);
+  // Log input type và nội dung
+  console.log("🔑 privHex type =", typeof privHex);
+  console.log("🔑 privHex =", privHex);
 
+  // Xử lý private key
+  let priv;
+  try {
+    if (Buffer.isBuffer(privHex)) {
+      priv = privHex;
+    } else if (typeof privHex === "string" && /^0x[0-9a-fA-F]{64}$/.test(privHex)) {
+      priv = Buffer.from(privHex.slice(2), "hex");
+    } else {
+      console.error("❌ Invalid privHex format:", privHex);
+      throw new Error("privHex must be 0x-prefixed hex string or Buffer of 32 bytes");
+    }
+  } catch (e) {
+    console.error("❌ Failed to convert privHex to Buffer:", e.message);
+    throw e;
+  }
+
+  console.log("✅ Converted priv:", priv.toString("hex"));
+
+  // Log ciphertext
+  console.log("🧩 Encrypted len =", encrypted.length);
+  console.log("🧩 Encrypted preview =", encrypted.toString("hex").slice(0, 100));
+
+  // Bắt lỗi giải mã ECIES
+  try {
+    const decrypted = ecies.decrypt(priv, encrypted);
+    console.log("✅ ECIES decrypt success!");
+    console.log("📝 Decrypted preview:", decrypted.toString("utf8").slice(0, 100));
+    return decrypted;
+  } catch (err) {
+    console.error("❌ ECIES decrypt failed:", err.message);
+    throw err;
+  }
 }
+
 
