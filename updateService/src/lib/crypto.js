@@ -38,8 +38,6 @@ export function signHash(hashBuf, privHex) {
   return "0x" + sigHex + vHex;
 }
 
-import * as secp from "@noble/secp256k1";
-
 /**
  * ECDSA verify (secp256k1) of a 32-byte hash
  * @param {Buffer} hashBuf      32-byte SHA-256 digest
@@ -50,38 +48,41 @@ import * as secp from "@noble/secp256k1";
 export async function verifySig(hashBuf, sigHex, pubHex) {
   console.log("🔐 [verifySig] called");
 
-  // 1) Normalize signature
-  console.log("🔐 [verifySig] raw sigHex      =", sigHex);
-  const sigBuf = Buffer.from(sigHex.replace(/^0x/, ""), "hex");
-  console.log("🔐 [verifySig] sigBuf.length    =", sigBuf.length);
-  if (sigBuf.length !== 65) {
-    console.error("🔐 [verifySig] ❌ invalid signature length");
+  // 1) Normalize and check signature length
+  const sigClean = sigHex.replace(/^0x/, "");
+  if (sigClean.length !== 130) {
+    console.error("🔐 [verifySig] ❌ signature hex length must be 130, got", sigClean.length);
     return false;
   }
+  const sigBuf = Buffer.from(sigClean, "hex");
+  console.log("🔐 [verifySig] sigBuf.length =", sigBuf.length);  // should be 65
 
-  // 2) Extract r|s (first 64 bytes)
+  // 2) Split r|s (first 64 bytes), ignore recovery byte
   const rsBuf = sigBuf.slice(0, 64);
   const rsHex = rsBuf.toString("hex");
-  console.log("🔐 [verifySig] r|s (hex)        =", rsHex);
+  console.log("🔐 [verifySig] r|s (hex) =", rsHex);
 
   // 3) Prepare message hash
   const msgHex = hashBuf.toString("hex");
-  console.log("🔐 [verifySig] msgHash (hex)    =", msgHex);
+  console.log("🔐 [verifySig] msgHash (hex) =", msgHex);
 
   // 4) Normalize public key
-  const pubKey = pubHex.replace(/^0x/, "");
-  console.log("🔐 [verifySig] pubKey           =", pubKey.slice(0, 20) + "...");
+  const pubClean = pubHex.replace(/^0x/, "");
+  if (pubClean.length !== 130) {
+    console.warn("🔐 [verifySig] ⚠ pubKey hex length is", pubClean.length);
+  }
+  console.log("🔐 [verifySig] pubKey =", pubClean);
 
-  // 5) Run the verify
+  // 5) Verify
   let ok;
   try {
-    ok = await secp.verify(rsHex, msgHex, pubKey);
+    ok = await secp.verify(rsHex, msgHex, pubClean);
   } catch (err) {
     console.error("🔐 [verifySig] ❌ secp.verify threw:", err);
     return false;
   }
 
-  console.log("🔐 [verifySig] result           =", ok);
+  console.log("🔐 [verifySig] result =", ok);
   return ok;
 }
 
