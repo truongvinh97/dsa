@@ -38,10 +38,12 @@ export function signHash(hashBuf, privHex) {
   return "0x" + sigHex + vHex;
 }
 
+import * as secp from "@noble/secp256k1";
+
 /**
  * ECDSA verify (secp256k1) of a 32-byte hash
  * @param {Buffer} hashBuf      32-byte SHA-256 digest
- * @param {string} sigHex       0x-prefixed 65-byte signature (r|s|recovery)
+ * @param {string} sigHex       0x-prefixed 65-byte signature (r|s|v)
  * @param {string} pubHex       0x04-prefixed uncompressed public key
  * @returns {Promise<boolean>}
  */
@@ -50,18 +52,16 @@ export async function verifySig(hashBuf, sigHex, pubHex) {
 
   // 1) Normalize signature
   console.log("🔐 [verifySig] raw sigHex      =", sigHex);
-  const sigStr = sigHex.replace(/^0x/, "");
-  const sigBuf = Buffer.from(sigStr, "hex");
+  const sigBuf = Buffer.from(sigHex.replace(/^0x/, ""), "hex");
   console.log("🔐 [verifySig] sigBuf.length    =", sigBuf.length);
-
   if (sigBuf.length !== 65) {
     console.error("🔐 [verifySig] ❌ invalid signature length");
     return false;
   }
 
-  // 2) Split r|s and recovery (we only need r|s for verify)
-  const rs    = sigBuf.slice(0, 64);
-  const rsHex = secp.utils.bytesToHex(rs);
+  // 2) Extract r|s (first 64 bytes)
+  const rsBuf = sigBuf.slice(0, 64);
+  const rsHex = rsBuf.toString("hex");
   console.log("🔐 [verifySig] r|s (hex)        =", rsHex);
 
   // 3) Prepare message hash
