@@ -79,12 +79,22 @@ export function aesGcmEncrypt(plaintext, key) {
  * @returns {Buffer}           plaintext
  */
 export function aesGcmDecrypt(encrypted, key) {
-  const iv = encrypted.slice(0, 12);
+  // 1) Tách iv/tag/ct
+  const iv  = encrypted.slice(0, 12);
   const tag = encrypted.slice(encrypted.length - 16);
-  const ct = encrypted.slice(12, encrypted.length - 16);
+  const ct  = encrypted.slice(12, encrypted.length - 16);
+
+  console.log("🛠 [AES-GCM] iv =", iv.toString("hex"));
+  console.log("🛠 [AES-GCM] tag =", tag.toString("hex"));
+  console.log("🛠 [AES-GCM] ciphertext.preview =", ct.toString("hex").slice(0,100), "...");
+
+  // 2) Giải mã
   const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(ct), decipher.final()]);
+  const pt = Buffer.concat([decipher.update(ct), decipher.final()]);
+
+  console.log("✅ [AES-GCM] plaintext.preview =", pt.toString("hex").slice(0,100), "...");
+  return pt;
 }
 
 /**
@@ -129,6 +139,7 @@ export async function eciesDecrypt(privHex, encrypted) {
   // 3) Thực sự await decrypt, và bắt lỗi MAC ở đây
   try {
     const decrypted = await ecies.decrypt(priv, encrypted);
+    console.log("🛠 [ECIES] decrypted (utf8) preview =", decrypted.toString("utf8").slice(0,100));
     console.log("✅ ECIES decrypt thành công!");
     console.log("📝 decrypted.preview =", decrypted.toString("hex").slice(0, 100));
     return decrypted;  // Đây mới là Buffer

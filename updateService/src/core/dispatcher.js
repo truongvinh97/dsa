@@ -120,6 +120,8 @@ async function processNewFirmware({
 
     // 5️⃣ decrypt firmware
     const firmware = aesGcmDecrypt(cipherBuf, sessKey);
+    console.log("▶ [Dispatcher] firmware.length =", firmware.length);
+    console.log("▶ [Dispatcher] firmware.preview =", firmware.slice(0,100).toString("hex"), "...");
 
     // 6️⃣ verify hash & signature
     const localHashHex = "0x" + sha256(firmware).toString("hex");
