@@ -9,7 +9,7 @@ import mqttClient         from "../mqtt/client.js";
 import { web3, Firmware, Device, KeyRegistry, sendTx }
   from "../web3/index.js";
 
-import { downloadFile }      from "../lib/ipfs.js";
+import { downloadFile, uploadFile }      from "../lib/ipfs.js";
 import { deriveGroupKey, deriveWrapPrivKey }
   from "../lib/key_service.js";
 import { eciesDecrypt, aesGcmDecrypt, verifySig, sha256 }
@@ -123,6 +123,10 @@ async function processNewFirmware({
     console.log("▶ [Dispatcher] firmware.length =", firmware.length);
     console.log("▶ [Dispatcher] firmware.preview =", firmware.slice(0,100).toString("hex"), "...");
 
+    console.log("▶ [Dispatcher] uploading decrypted .bin to IPFS …");
+    const newCid = await uploadFile(firmware);      // <-- uses your helper
+    console.log(`▶ [Dispatcher] upload complete → new CID = ${newCid}`);
+
     // 6️⃣ verify hash & signature
     const hashBuf   = sha256(firmware);
     const sigValid  = await verifySig(hashBuf, signature, process.env.MFG_PUB_KEY);
@@ -144,7 +148,7 @@ async function processNewFirmware({
     // 8️⃣ publish OTA_START to each
     for (const d of targets) {
       const topic   = `ota/${d.deviceId}`;
-      const payload = { command:"OTA_START", manifestVersion, cid, keyID, hash, signature };
+      const payload = { command:"OTA_START", manifestVersion, newCid, keyID, hash, signature };
       await mqttClient.publishUpdate(d.deviceId, payload);
       console.log(`[Dispatcher] ➡ OTA_START → ${d.deviceId}`);
     }

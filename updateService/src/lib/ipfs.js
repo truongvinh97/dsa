@@ -1,5 +1,5 @@
 /**
- *  server/src/services/ipfs.service.js
+ *  src/lib/ipfs.js
  *  -----------------------------------
  *  Upload via local IPFS daemon
  *  Download via local gateway → fallback public gateway → fallback wget

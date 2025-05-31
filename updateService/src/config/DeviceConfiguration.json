@@ -6,7 +6,7 @@
     "privPath": "/etc/ota/keys/DEV-001.priv"
   },
   "Dev2": {
-    "autoUpdate": false,
+    "autoUpdate": true,
     "deviceType": "sensorBoard",
     "pubKey": "0x04b2c3d4e5f678901234567890abcdef1234567890abcdef1234567890abcdef1234",
     "privPath": "/etc/ota/keys/DEV-002.priv"
